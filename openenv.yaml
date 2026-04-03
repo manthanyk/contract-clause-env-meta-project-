@@ -1,56 +1,14 @@
-name: resource-allocation-env
+name: contract-clause-env
 version: "1.0.0"
-description: |
-  A real-world RL environment for resource allocation optimization.
-  Agents learn to allocate limited resources (developers, designers, budget)
-  to maximize project value while respecting constraints.
-
-author: your-hf-username
-license: MIT
-
+description: "Contract Clause Review Environment"
+url: "https://huggingface.co/spaces/ManthanYk/contract-clause-env"
 tasks:
   - id: easy
-    name: Easy Task - Item Finding
-    description: |
-      Find a specific item in a small collection by navigating through positions.
-      The agent receives partial rewards based on proximity to the target.
-    difficulty: easy
-    max_steps: 10
-    reward_range: [0.0, 1.0]
-    success_threshold: 0.8
-
+    name: "Clause Classification"
+    description: "Identify and classify contract clause types"
   - id: medium
-    name: Medium Task - Sorting
-    description: |
-      Sort a collection of items with multiple attributes by priority.
-      The agent receives partial rewards based on how many items are in correct positions.
-    difficulty: medium
-    max_steps: 20
-    reward_range: [0.0, 1.0]
-    success_threshold: 0.7
-
+    name: "Risk Rating"
+    description: "Rate risk levels of contract clauses"
   - id: hard
-    name: Hard Task - Resource Allocation
-    description: |
-      Allocate limited resources to projects to maximize total value while
-      respecting resource constraints. The agent receives partial rewards
-      based on how close to optimal the allocation is.
-    difficulty: hard
-    max_steps: 30
-    reward_range: [0.0, 1.0]
-    success_threshold: 0.6
-
-api:
-  base_url: https://your-hf-username-resource-allocation-env.hf.space
-  endpoints:
-    reset: POST /reset
-    step: POST /step
-    state: GET /state
-
-action_space:
-  type: object
-  description: "Actions vary by task difficulty level. Easy: movement and selection. Medium: sorting operations. Hard: resource allocation decisions."
-
-observation_space:
-  type: object
-  description: "Observations contain task-specific state information, available actions, and progress hints."
+    name: "Unfair Term Detection"
+    description: "Detect unfair or ambiguous terms"
