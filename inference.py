@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import asyncio
 from openai import OpenAI
@@ -12,45 +11,34 @@ from models import (
 )
 
 # REQUIRED: These env vars must be set
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
-HF_SPACE_URL = os.environ.get("HF_SPACE_URL", "http://localhost:7860")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN", "")
+HF_SPACE_URL = os.getenv("HF_SPACE_URL", "http://localhost:7860")
 
 # MUST use OpenAI client (not Anthropic SDK)
 client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
     base_url=API_BASE_URL,
-    api_key=os.environ.get("OPENAI_API_KEY", HF_TOKEN),
 )
 
 
 def log_start(task_id: str, episode: int):
-    print(
-        json.dumps({"type": "START", "task_id": task_id, "episode": episode}),
-        flush=True,
-    )
+    print("[START]", json.dumps({"task_id": task_id, "episode": episode}), flush=True)
 
 
 def log_step(step: int, action: dict, reward: float, done: bool):
     print(
-        json.dumps(
-            {
-                "type": "STEP",
-                "step": step,
-                "action": action,
-                "reward": reward,
-                "done": done,
-            }
-        ),
+        "[STEP]",
+        json.dumps({"step": step, "action": action, "reward": reward, "done": done}),
         flush=True,
     )
 
 
 def log_end(total_reward: float, steps: int):
     print(
-        json.dumps(
-            {"type": "END", "total_reward": round(total_reward, 4), "steps": steps}
-        ),
+        "[END]",
+        json.dumps({"total_reward": round(total_reward, 4), "steps": steps}),
         flush=True,
     )
 
@@ -147,7 +135,7 @@ async def run_episode(task_id: str, episode: int) -> float:
                 )
                 content = response.choices[0].message.content or ""
             except Exception as e:
-                print(json.dumps({"type": "ERROR", "message": str(e)}), flush=True)
+                print(f"LLM error: {e}", flush=True)
                 content = ""
 
             action = parse_action(task_id, content)
@@ -170,38 +158,18 @@ async def run_episode(task_id: str, episode: int) -> float:
 
 
 async def main():
-    print(
-        json.dumps({"type": "INFERENCE_START", "tasks": ["easy", "medium", "hard"]}),
-        flush=True,
-    )
     results = {}
 
     for task_id in ["easy", "medium", "hard"]:
         try:
             score = await run_episode(task_id=task_id, episode=1)
             results[task_id] = score
-            print(
-                json.dumps(
-                    {
-                        "type": "TASK_RESULT",
-                        "task_id": task_id,
-                        "score": round(score, 4),
-                    }
-                ),
-                flush=True,
-            )
         except Exception as e:
-            print(
-                json.dumps({"type": "TASK_ERROR", "task_id": task_id, "error": str(e)}),
-                flush=True,
-            )
+            print(f"Task '{task_id}' ERROR: {e}", flush=True)
             results[task_id] = 0.0
 
     avg = sum(results.values()) / len(results) if results else 0.0
-    print(
-        json.dumps({"type": "FINAL", "results": results, "average": round(avg, 4)}),
-        flush=True,
-    )
+    print(f"Average score: {avg:.4f}", flush=True)
     return results
 
 
