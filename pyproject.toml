@@ -1,0 +1,19 @@
+[project]
+name = "contract-clause-env"
+version = "1.0.0"
+description = "A real-world contract clause review environment for AI agents"
+dependencies = [
+    "fastapi>=0.68.0",
+    "uvicorn>=0.15.0",
+    "pydantic>=2.0.0",
+    "openenv-core>=0.1.0",
+    "openai>=1.0.0",
+    "httpx>=0.24.0",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["__init__", "models", "client", "inference"]
