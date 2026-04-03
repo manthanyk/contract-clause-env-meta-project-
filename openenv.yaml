@@ -1,14 +1,71 @@
 name: contract-clause-env
 version: "1.0.0"
-description: "Contract Clause Review Environment"
-url: "https://huggingface.co/spaces/ManthanYk/contract-clause-env"
+description: >
+  A real-world contract clause review environment where an AI agent
+  reviews legal contract clauses, identifies missing standard clauses,
+  rates risk levels, and detects unfair or ambiguous terms — exactly
+  as a professional lawyer would during contract due diligence.
+author: ManthanYk
+license: MIT
+
 tasks:
   - id: easy
-    name: "Clause Classification"
-    description: "Identify and classify contract clause types"
+    name: Missing Clause Detection
+    description: >
+      Identify which standard legal clauses are missing from a
+      contract. A complete contract should have termination,
+      indemnification, limitation of liability, confidentiality,
+      dispute resolution, governing law, payment terms, and
+      intellectual property clauses.
+    difficulty: easy
+    max_steps: 20
+    reward_range: [0.0, 1.0]
+    success_threshold: 0.8
+
   - id: medium
-    name: "Risk Rating"
-    description: "Rate risk levels of contract clauses"
+    name: Clause Risk Rating
+    description: >
+      Rate the risk level of a given contract clause as low, medium,
+      high, or critical. Explain who is disadvantaged and why the
+      clause is problematic.
+    difficulty: medium
+    max_steps: 30
+    reward_range: [0.0, 1.0]
+    success_threshold: 0.7
+
   - id: hard
-    name: "Unfair Term Detection"
-    description: "Detect unfair or ambiguous terms"
+    name: Unfair Term Detection
+    description: >
+      Detect all unfair, ambiguous, or legally problematic elements
+      in a contract clause. Identify every issue and propose fairer
+      alternative language.
+    difficulty: hard
+    max_steps: 50
+    reward_range: [0.0, 1.0]
+    success_threshold: 0.6
+
+api:
+  base_url: https://manthanyk-contract-clause-env.hf.space
+  endpoints:
+    reset: POST /reset
+    step: POST /step
+    state: GET /state
+
+action_space:
+  type: object
+  description: >
+    flag_missing: identify missing clauses |
+    rate_risk: rate clause risk level |
+    flag_unfair: identify unfair terms |
+    request_clarification: ask for more context |
+    approve: mark contract as acceptable
+
+observation_space:
+  type: object
+  description: >
+    contract_text: the contract or clause being reviewed |
+    contract_type: type of contract |
+    clauses_present: list of clauses found |
+    risk_flags: identified risks |
+    current_score: float 0.0-1.0 |
+    progress_hint: guidance for next action
