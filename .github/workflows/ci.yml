@@ -1,0 +1,68 @@
+name: CI — Contract Clause Env
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r server/requirements.txt
+
+      - name: Run grader unit tests
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: Smoke test — environment startup
+        run: |
+          python -c "
+          import asyncio, sys
+          sys.path.insert(0, '.')
+          from server.environment import ContractClauseEnvironment
+          from models import ContractClauseAction, ActionType, ClauseType
+          async def test():
+              env = ContractClauseEnvironment()
+              for task_id in ['easy', 'medium', 'hard']:
+                  obs = await env.reset(task_id=task_id)
+                  assert obs.contract_text
+                  result = await env.step(ContractClauseAction(
+                      action_type=ActionType.FLAG_MISSING,
+                      missing_clauses=[ClauseType.TERMINATION]
+                  ))
+                  r = result['reward']
+                  assert 0.0 <= r <= 1.0, f'{task_id}: {r} out of range'
+              print('All smoke tests passed.')
+          asyncio.run(test())
+          "
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t contract-clause-env-ci .
+
+      - name: Start container and verify health
+        run: |
+          docker run -d --name ccenv \
+            -p 7860:7860 \
+            -e API_BASE_URL=https://api.openai.com/v1 \
+            -e MODEL_NAME=gpt-4o-mini \
+            -e HF_TOKEN=test_token \
+            contract-clause-env-ci
+          sleep 8
+          curl -f http://localhost:7860/health
+          curl -s -X POST http://localhost:7860/reset \
+            -H "Content-Type: application/json" \
+            -d '{"task_id":"easy"}' | python -m json.tool
