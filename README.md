@@ -105,8 +105,15 @@ reward_range: [0.0, 1.0]
 
 Built for the **Scaler × Meta PyTorch Hackathon**
 - Domain: Contract Clause Review
-- Team: ManthanYk
 - Deadline: April 8, 2025
+
+## 👥 Team
+
+| Name | Role | Email |
+|------|------|-------|
+| Narendra Reddy | Team Lead | narendrareddy.r333@gmail.com |
+| R. Andrews Emmanuel | Member | randrewsemmanuel@gmail.com |
+| Manthu | Member | manthanyk2007@gmail.com |
 
 ---
 Made with ❤️ for the Meta PyTorch Hackathon
