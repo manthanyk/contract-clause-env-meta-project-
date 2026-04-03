@@ -1,7 +1,12 @@
 import os
 import json
 import asyncio
+import subprocess
+from typing import Dict, Any
+
+import httpx
 from openai import OpenAI
+
 from client import MyEnvClient
 from models import (
     ContractClauseAction,
@@ -14,13 +19,42 @@ from models import (
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
-HF_SPACE_URL = os.getenv("HF_SPACE_URL", "http://localhost:7860")
+BASE_URL = os.getenv("ENV_URL", "http://localhost:7860")
+LOCAL_SERVER = os.getenv("LOCAL_SERVER", "true").lower() != "false"
 
 # OpenAI client pointing to HF endpoint
-client = OpenAI(
-    api_key=HF_TOKEN,
-    base_url=API_BASE_URL,
-)
+client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+
+_server_process = None
+
+
+async def _is_server_up(base_url: str) -> bool:
+    try:
+        async with httpx.AsyncClient(base_url=base_url, timeout=2.0) as c:
+            resp = await c.get("/health")
+            return resp.status_code == 200
+    except Exception:
+        return False
+
+
+async def _ensure_server(base_url: str):
+    """Start local uvicorn if requested and not already running."""
+    global _server_process
+    if not LOCAL_SERVER:
+        return
+    if await _is_server_up(base_url):
+        return
+    _server_process = subprocess.Popen(
+        ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"],
+        cwd=os.path.dirname(__file__),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    for _ in range(10):
+        if await _is_server_up(base_url):
+            return
+        await asyncio.sleep(0.5)
+    raise RuntimeError("Local server failed to start on http://localhost:7860")
 
 
 def log_start(task_id: str, episode: int):
@@ -35,10 +69,16 @@ def log_step(step: int, action: dict, reward: float, done: bool):
     )
 
 
-def log_end(total_reward: float, steps: int):
+def log_end(total_reward: float, steps: int, task_id: str):
     print(
         "[END]",
-        json.dumps({"total_reward": round(total_reward, 4), "steps": steps}),
+        json.dumps(
+            {
+                "total_reward": round(total_reward, 4),
+                "steps": steps,
+                "task_id": task_id,
+            }
+        ),
         flush=True,
     )
 
@@ -71,10 +111,21 @@ def build_prompt_for_task(task_id: str, obs) -> str:
         )
 
 
+def _safe_json_parse(raw: str) -> Dict[str, Any]:
+    raw = raw.strip()
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        if lines[-1].strip() == "```":
+            raw = "\n".join(lines[1:-1])
+        else:
+            raw = "\n".join(lines[1:])
+    return json.loads(raw)
+
+
 def parse_action(task_id: str, content: str) -> ContractClauseAction:
     """Parse LLM response into a ContractClauseAction."""
     try:
-        data = json.loads(content)
+        data = _safe_json_parse(content)
         action_type = ActionType(data.get("action_type", "request_clarification"))
 
         kwargs: dict = {"action_type": action_type}
@@ -111,7 +162,9 @@ async def run_episode(task_id: str, episode: int) -> float:
     """Run one episode and return total reward."""
     log_start(task_id, episode)
 
-    async with MyEnvClient(base_url=HF_SPACE_URL) as env:
+    await _ensure_server(BASE_URL)
+
+    async with MyEnvClient(base_url=BASE_URL) as env:
         obs = await env.reset(task_id=task_id)
         total_reward = 0.0
         done = False
@@ -148,12 +201,12 @@ async def run_episode(task_id: str, episode: int) -> float:
 
             log_step(
                 step=step_num,
-                action=action.model_dump(),
+                action=action.model_dump(exclude_none=True),
                 reward=round(result.reward, 4),
                 done=done,
             )
 
-    log_end(total_reward=total_reward, steps=step_num)
+    log_end(total_reward=total_reward, steps=step_num, task_id=task_id)
     return total_reward
 
 
