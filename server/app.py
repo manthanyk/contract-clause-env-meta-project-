@@ -16,6 +16,25 @@ environment = MyEnvironment()
 app = FastAPI(title="Contract Clause Review Environment", version="1.0.0")
 
 
+@app.get("/")
+def root():
+    return {
+        "name": "Contract Clause Review Environment",
+        "version": "1.0.0",
+        "description": "OpenEnv RL environment for contract clause analysis",
+        "team": "ManthanYk",
+        "hackathon": "Scaler x Meta PyTorch Hackathon",
+        "endpoints": {
+            "health": "/health",
+            "reset": "/reset",
+            "step": "/step",
+            "state": "/state",
+            "docs": "/docs",
+        },
+        "status": "running",
+    }
+
+
 @app.post("/reset", response_model=ContractClauseObservation)
 async def reset(task_id: str = "easy"):
     """Reset the environment to start a new episode"""
