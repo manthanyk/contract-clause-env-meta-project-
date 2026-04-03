@@ -10,15 +10,15 @@ from models import (
     RiskLevel,
 )
 
-# REQUIRED: These env vars must be set
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+# Environment variables
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 HF_SPACE_URL = os.getenv("HF_SPACE_URL", "http://localhost:7860")
 
-# MUST use OpenAI client (not Anthropic SDK)
+# OpenAI client pointing to HF endpoint
 client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
+    api_key=HF_TOKEN,
     base_url=API_BASE_URL,
 )
 
