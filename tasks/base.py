@@ -1,10 +1,10 @@
-from models import MyAction, MyObservation
+from models import ContractClauseAction, ContractClauseObservation
 from typing import Tuple
 from abc import ABC, abstractmethod
 
 
 class BaseTask(ABC):
-    """Base class for all task implementations"""
+    """Base class for all contract clause task implementations"""
 
     COMPLETION_THRESHOLD = 0.95
     HINT_THRESHOLDS = [0.9, 0.7, 0.5, 0.3]
@@ -16,37 +16,58 @@ class BaseTask(ABC):
         self.current_state = {}
 
     @abstractmethod
-    async def reset(self) -> MyObservation:
+    async def reset(self) -> ContractClauseObservation:
         """Reset the task and return initial observation"""
         pass
 
-    async def step(self, action: MyAction) -> Tuple[MyObservation, float, bool]:
+    async def step(
+        self, action: ContractClauseAction
+    ) -> Tuple[ContractClauseObservation, float, bool]:
         """Execute one step and return (observation, reward, done)"""
         self.step_count += 1
         self.current_state = self._apply_action(action)
-        reward = self._grade()
+        reward = self._grade(action)
         done = reward >= self.COMPLETION_THRESHOLD or self.step_count >= self.max_steps
-        obs = MyObservation(
-            current_state=self.current_state,
+        obs = ContractClauseObservation(
+            contract_text=self._get_contract_text(),
+            task_description=self._get_task_description(),
+            current_score=reward,
+            step_count=self.step_count,
+            max_steps=self.max_steps,
             available_actions=self._get_available_actions(),
-            progress_hint=self._get_hint(reward)
+            progress_hint=self._get_hint(reward),
+            review_comments=self._get_review_comments(),
         )
         return obs, reward, done
 
     @abstractmethod
-    def _apply_action(self, action: MyAction) -> dict:
+    def _apply_action(self, action: ContractClauseAction) -> dict:
         """Apply action to current state and return new state"""
         pass
 
     @abstractmethod
-    def _grade(self) -> float:
+    def _grade(self, action: ContractClauseAction) -> float:
         """Calculate reward for current state (0.0-1.0)"""
         pass
 
     @abstractmethod
     def _get_available_actions(self) -> list:
-        """Return list of available action names"""
+        """Return list of available action types"""
         pass
+
+    @abstractmethod
+    def _get_contract_text(self) -> str:
+        """Return the contract text"""
+        pass
+
+    @abstractmethod
+    def _get_task_description(self) -> str:
+        """Return the task description"""
+        pass
+
+    def _get_review_comments(self) -> list:
+        """Return review comments"""
+        return []
 
     def _get_hint(self, reward: float) -> str:
         """Provide progress hint based on reward level"""

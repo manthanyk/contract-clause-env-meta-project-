@@ -1,129 +1,294 @@
-from models import MyAction, MyObservation
-from typing import Tuple
+from models import (
+    ContractClauseAction,
+    ContractClauseObservation,
+    ActionType,
+    RiskLevel,
+)
+from typing import Tuple, List, Dict, Any
 from tasks.base import BaseTask
+import random
+
+
+MEDIUM_CONTRACTS: List[Dict[str, Any]] = [
+    {
+        "text": """
+SERVICE AGREEMENT
+
+This Service Agreement (the "Agreement") is effective as of January 1, 2024.
+
+1. SERVICES
+Provider agrees to deliver services as specified in Exhibit A. Provider may
+substitute materials of equivalent quality without prior notice.
+
+2. PAYMENT
+Client shall pay all fees within 30 days of invoice. Late payments subject to
+2% monthly penalty. Client waives right to dispute charges after 10 days.
+
+3. LIMITATION OF LIABILITY
+Provider's liability is limited to fees paid in the preceding 3 months.
+Provider is not liable for indirect, consequential, or incidental damages.
+
+4. INDEMNIFICATION
+Client agrees to indemnify Provider for all claims arising from Client's use
+of services, including Provider's negligence, except for gross negligence.
+
+5. TERMINATION
+Either party may terminate with 30 days notice. Upon termination, Client must
+immediately cease use and destroy all materials. No refunds for prepaid services.
+
+6. INTELLECTUAL PROPERTY
+All deliverables become Client's property upon full payment. Provider retains
+rights to pre-existing materials and may use Client's name in marketing.
+
+7. GOVERNING LAW
+This Agreement is governed by the laws of Provider's state of incorporation.
+
+Signed: ___________________
+""",
+        "clauses": [
+            {
+                "text": """PAYMENT
+Client shall pay all fees within 30 days of invoice. Late payments subject to
+2% monthly penalty. Client waives right to dispute charges after 10 days.""",
+                "risk_level": RiskLevel.HIGH,
+                "reason_keywords": [
+                    "penalty",
+                    "waive",
+                    "dispute",
+                    "one-sided",
+                    "unfair",
+                ],
+                "explanation": "2% monthly penalty is excessive and waiver of dispute rights heavily favors provider.",
+            },
+            {
+                "text": """LIMITATION OF LIABILITY
+Provider's liability is limited to fees paid in the preceding 3 months.
+Provider is not liable for indirect, consequential, or incidental damages.""",
+                "risk_level": RiskLevel.HIGH,
+                "reason_keywords": [
+                    "limited",
+                    "liability",
+                    "cap",
+                    "unfair",
+                    "one-sided",
+                ],
+                "explanation": "Very narrow liability cap that leaves client exposed to significant losses.",
+            },
+            {
+                "text": """INDEMNIFICATION
+Client agrees to indemnify Provider for all claims arising from Client's use
+of services, including Provider's negligence, except for gross negligence.""",
+                "risk_level": RiskLevel.MEDIUM,
+                "reason_keywords": ["indemnify", "broad", "negligence", "one-sided"],
+                "explanation": "Broad indemnification that includes provider's own negligence is problematic.",
+            },
+        ],
+    },
+    {
+        "text": """
+CONSULTING MASTER SERVICES AGREEMENT
+
+1. SCOPE OF WORK
+Consultant will provide advisory services as defined in individual Statements of Work.
+Consultant reserves the right to decline any engagement without penalty.
+
+2. COMPENSATION
+Fees are due within 15 days of invoice. Consultant may suspend services for any
+outstanding balance exceeding 5 days past due. Interest accrues at 3% per month.
+
+3. OWNERSHIP
+All work product, including pre-existing IP incorporated into deliverables,
+becomes the sole property of Client upon payment.
+
+4. NON-SOLICITATION
+Client may not hire any Consultant employee for 24 months following engagement.
+Penalty: $50,000 per violation.
+
+5. TERMINATION
+Consultant may terminate immediately for any reason. Client must provide 60 days
+written notice and pay all fees through the termination date plus a 15% early
+termination fee.
+""",
+        "clauses": [
+            {
+                "text": """COMPENSATION
+Fees are due within 15 days of invoice. Consultant may suspend services for any
+outstanding balance exceeding 5 days past due. Interest accrues at 3% per month.""",
+                "risk_level": RiskLevel.HIGH,
+                "reason_keywords": [
+                    "suspend",
+                    "interest",
+                    "penalty",
+                    "unfair",
+                    "one-sided",
+                ],
+                "explanation": "3% monthly interest is usurious and 5-day suspension window is extremely aggressive.",
+            },
+            {
+                "text": """NON-SOLICITATION
+Client may not hire any Consultant employee for 24 months following engagement.
+Penalty: $50,000 per violation.""",
+                "risk_level": RiskLevel.MEDIUM,
+                "reason_keywords": [
+                    "non-solicitation",
+                    "penalty",
+                    "restrictive",
+                    "unfair",
+                ],
+                "explanation": "24-month non-solicitation with fixed $50k penalty is overly restrictive on client.",
+            },
+            {
+                "text": """TERMINATION
+Consultant may terminate immediately for any reason. Client must provide 60 days
+written notice and pay all fees through the termination date plus a 15% early
+termination fee.""",
+                "risk_level": RiskLevel.HIGH,
+                "reason_keywords": [
+                    "asymmetric",
+                    "termination",
+                    "unfair",
+                    "one-sided",
+                    "penalty",
+                ],
+                "explanation": "Completely asymmetric termination rights with early termination penalty on client only.",
+            },
+        ],
+    },
+    {
+        "text": """ASSIGNMENT
+Provider may assign this agreement and all obligations hereunder
+to any third party without Client's consent. Client may not
+assign any rights without Provider's prior written approval.""",
+        "risk_level": RiskLevel.HIGH,
+        "reason_keywords": [
+            "unilateral",
+            "assign",
+            "no consent",
+            "one-sided",
+            "third party",
+        ],
+        "explanation": "Provider can assign freely while client cannot — creates asymmetric control and risk of unknown parties taking over the contract.",
+    },
+]
+
 
 class MediumTask(BaseTask):
     """
-    Medium task: Sort a collection of items with multiple attributes
-    Grader: Based on how well sorted the items are
+    Medium task: Assess risk levels of contract clauses.
+    Grader: Based on accuracy of risk assessments.
     """
 
     def __init__(self):
-        super().__init__(max_steps=20, difficulty="medium")
-        self.target_order = None
+        super().__init__(max_steps=30, difficulty="medium")
+        self.risk_assessments = {}
+        self.clause = None
+        self.contract = None
 
-    async def reset(self) -> MyObservation:
-        # Initialize medium task state
-        self.target_order = self._generate_target_order()
-        self.current_state = self._init_state()
+    async def reset(self) -> ContractClauseObservation:
+        self.risk_assessments = {}
         self.step_count = 0
-        return MyObservation(
-            current_state=self.current_state,
-            available_actions=self._get_available_actions(),
-            task_description=f"Medium task: Sort items by priority (1=highest, 5=lowest)"
+        self.current_state = {"assessments": {}}
+        self.contract = random.choice(MEDIUM_CONTRACTS)
+        if "clauses" in self.contract:
+            self.clause = random.choice(self.contract["clauses"])
+        else:
+            self.clause = self.contract
+        return ContractClauseObservation(
+            contract_text=self.contract["text"],
+            task_description="Assess the risk level (none/low/medium/high/critical) of the highlighted contract clause and explain your reasoning.",
+            current_score=0.0,
+            step_count=0,
+            max_steps=self.max_steps,
+            available_actions=[
+                ActionType.RISK_ASSESS,
+                ActionType.REQUEST_CLARIFICATION,
+            ],
+            progress_hint="Focus on payment terms, liability limits, and indemnification clauses.",
         )
 
-    async def step(self, action: MyAction) -> Tuple[MyObservation, float, bool]:
+    async def step(
+        self, action: ContractClauseAction
+    ) -> Tuple[ContractClauseObservation, float, bool]:
         return await super().step(action)
 
-    def _generate_target_order(self):
-        """Generate the target order for the medium task"""
-        return [
-            {"id": "item_a", "priority": 1},
-            {"id": "item_b", "priority": 2},
-            {"id": "item_c", "priority": 3},
-            {"id": "item_d", "priority": 4},
-            {"id": "item_e", "priority": 5}
-        ]
-
-    def _init_state(self):
-        """Initialize the environment state"""
-        # Start with shuffled order
-        return {
-            "items": [
-                {"id": "item_c", "priority": 3},
-                {"id": "item_a", "priority": 1},
-                {"id": "item_e", "priority": 5},
-                {"id": "item_b", "priority": 2},
-                {"id": "item_d", "priority": 4}
-            ],
-            "selected_items": [],
-            "swap_buffer": None
-        }
-
-    def _get_available_actions(self):
-        """Get list of available actions"""
-        return ["select_item", "swap_items", "sort_section", "check_order"]
-
-    def _apply_action(self, action: MyAction):
-        """Apply the action to the current state"""
+    def _apply_action(self, action: ContractClauseAction) -> dict:
         state = self.current_state.copy()
 
-        if action.action_type == "select_item":
-            item_index = action.parameters.get("index", 0)
-            if 0 <= item_index < len(state["items"]):
-                if state["swap_buffer"] is None:
-                    state["swap_buffer"] = item_index
-                else:
-                    # Swap the items
-                    buf_idx = state["swap_buffer"]
-                    state["items"][buf_idx], state["items"][item_index] = \
-                        state["items"][item_index], state["items"][buf_idx]
-                    state["swap_buffer"] = None
-
-        elif action.action_type == "swap_items":
-            idx1 = action.parameters.get("index1", 0)
-            idx2 = action.parameters.get("index2", 1)
-            if 0 <= idx1 < len(state["items"]) and 0 <= idx2 < len(state["items"]):
-                state["items"][idx1], state["items"][idx2] = \
-                    state["items"][idx2], state["items"][idx1]
-
-        elif action.action_type == "sort_section":
-            start = action.parameters.get("start", 0)
-            end = action.parameters.get("end", len(state["items"]))
-            if 0 <= start < end <= len(state["items"]):
-                state["items"][start:end] = sorted(
-                    state["items"][start:end],
-                    key=lambda x: x["priority"]
-                )
-
-        elif action.action_type == "check_order":
-            # This action doesn't change state but might provide info
-            pass
+        if action.action_type == ActionType.RISK_ASSESS and action.risk_explanation:
+            explanation = action.risk_explanation.lower()
+            for clause_key in self.contract.get("clauses", []):
+                if clause_key.get("text", "").lower()[:20] in explanation:
+                    self.risk_assessments[clause_key["text"][:30]] = action.risk_level
+            state["assessments"] = self.risk_assessments
 
         return state
 
-    def _grade(self) -> float:
-        state = self.current_state
-        target_order = self.target_order
-        """
-        Grade the current state based on how well sorted the items are
-        Returns a value between 0.0 and 1.0
-        """
-        items = state["items"]
+    def _get_available_actions(self):
+        return [ActionType.RISK_ASSESS, ActionType.REQUEST_CLARIFICATION]
 
-        # Count how many items are in the correct position
-        correct_positions = 0
-        for i, (current, target) in enumerate(zip(items, target_order)):
-            if current["id"] == target["id"]:
-                correct_positions += 1
+    def _get_contract_text(self) -> str:
+        return self.contract["text"] if self.contract else ""
 
-        # Calculate the reward based on correct positions
-        if len(items) == 0:
-            return 0.0
+    def _get_task_description(self) -> str:
+        return "Assess the risk level (none/low/medium/high/critical) of the highlighted contract clause and explain your reasoning."
 
-        return correct_positions / len(items)
+    def _grade(self, action: ContractClauseAction) -> float:
+        score = 0.0
+        explanation = (action.risk_explanation or "").lower()
+
+        if action.risk_level is None:
+            pass
+        elif action.risk_level == self.clause["risk_level"]:
+            score += 0.25
+        else:
+            risk_order = [
+                RiskLevel.LOW,
+                RiskLevel.MEDIUM,
+                RiskLevel.HIGH,
+                RiskLevel.CRITICAL,
+            ]
+            # Guard against risk_level not in risk_order (e.g., RiskLevel.NONE)
+            if action.risk_level in risk_order and self.clause["risk_level"] in risk_order:
+                diff = abs(
+                    risk_order.index(action.risk_level)
+                    - risk_order.index(self.clause["risk_level"])
+                )
+                if diff == 1:
+                    score += 0.10
+
+        if len(explanation) > 20:
+            score += 0.25
+
+        disadvantaged_keywords = [
+            "provider",
+            "consultant",
+            "freelancer",
+            "vendor",
+            "seller",
+            "client",
+            "company",
+            "buyer",
+            "one-sided",
+            "unfair",
+            "favours",
+            "favor",
+        ]
+        if any(kw in explanation for kw in disadvantaged_keywords):
+            score += 0.25
+
+        if any(kw in explanation for kw in self.clause.get("reason_keywords", [])):
+            score += 0.25
+
+        return round(min(max(score, 0.0), 1.0), 4)
 
     def _get_hint(self, reward: float) -> str:
-        """Provide a hint based on the current reward"""
         if reward >= 0.9:
-            return "The items are almost perfectly sorted!"
+            return "Excellent risk assessment!"
         elif reward >= 0.7:
-            return "Most items are in the correct order."
+            return "Good progress. Re-examine the liability and payment clauses."
         elif reward >= 0.5:
-            return "About half the items are sorted correctly."
+            return "Focus on clauses that heavily favor one party."
         elif reward >= 0.3:
-            return "Some items are in the right position."
+            return "Look for unlimited liability or penalties."
         else:
-            return "The items need more sorting."
-
+            return "Hint: Payment penalties, liability caps, and broad indemnification are typically high-risk."

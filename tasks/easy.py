@@ -1,103 +1,242 @@
-from models import MyAction, MyObservation
-from typing import Tuple
+from models import (
+    ContractClauseAction,
+    ContractClauseObservation,
+    ActionType,
+    ClauseType,
+)
+from typing import Tuple, List, Dict, Any
 from tasks.base import BaseTask
+import random
+
+
+EASY_CONTRACTS: List[Dict[str, Any]] = [
+    {
+        "text": """
+SOFTWARE LICENSE AGREEMENT
+
+This Software License Agreement (the "Agreement") is entered into between:
+Licensor: ABC Software Corp
+Licensee: XYZ Company
+
+1. LICENSE GRANT
+ABC Software Corp grants XYZ Company a non-exclusive license to use the software.
+
+2. INTELLECTUAL PROPERTY
+All intellectual property rights remain with ABC Software Corp.
+
+3. CONFIDENTIALITY
+Both parties agree to maintain confidentiality of proprietary information.
+
+Signed: ________________
+Date: ________________
+""",
+        "contract_type": "software_license",
+        "missing": [
+            ClauseType.TERMINATION,
+            ClauseType.PAYMENT,
+            ClauseType.GOVERNING_LAW,
+        ],
+        "present": ["license_grant", "intellectual_property", "confidentiality"],
+    },
+    {
+        "text": """
+NON-DISCLOSURE AGREEMENT
+
+This NDA is between DataTech Inc ("Disclosing Party") and AnalytiCo ("Receiving Party").
+
+1. DEFINITION
+Confidential Information includes all technical and business information shared.
+
+2. OBLIGATIONS
+Receiving Party shall not disclose Confidential Information to third parties.
+
+3. TERM
+This agreement remains in effect for 2 years from the date of signing.
+
+Signed: ________________
+""",
+        "contract_type": "nda",
+        "missing": [
+            ClauseType.DISPUTE_RESOLUTION,
+            ClauseType.LIMITATION_LIABILITY,
+            ClauseType.INDEMNIFICATION,
+        ],
+        "present": ["confidentiality", "term"],
+    },
+    {
+        "text": """
+EMPLOYMENT CONTRACT
+
+Between InnovateTech ("Employer") and Jane Doe ("Employee").
+
+1. POSITION
+Employee shall serve as Senior Software Engineer.
+
+2. COMPENSATION
+Annual salary of $120,000, paid bi-weekly.
+
+3. BENEFITS
+Employee receives health insurance, 401k matching, and 20 days PTO.
+
+4. CONFIDENTIALITY
+Employee agrees to keep all company information confidential.
+
+Signed: ________________
+Date: ________________
+""",
+        "contract_type": "employment",
+        "missing": [
+            ClauseType.TERMINATION,
+            ClauseType.DISPUTE_RESOLUTION,
+            ClauseType.GOVERNING_LAW,
+            ClauseType.FORCE_MAJEURE,
+        ],
+        "present": ["compensation", "confidentiality"],
+    },
+    {
+        "text": """VENDOR AGREEMENT
+
+Between SupplyMax Inc ("Vendor") and RetailCo ("Buyer").
+
+1. PRODUCTS
+Vendor shall supply goods as ordered by Buyer from time to time.
+
+2. PRICING
+Prices are as agreed in purchase orders issued by Buyer.
+
+3. DELIVERY
+Vendor shall deliver within 14 days of order confirmation.
+
+4. PAYMENT
+Buyer shall pay within 30 days of delivery and invoice receipt.
+""",
+        "contract_type": "vendor_agreement",
+        "missing": [
+            ClauseType.TERMINATION,
+            ClauseType.LIMITATION_LIABILITY,
+            ClauseType.INDEMNIFICATION,
+            ClauseType.DISPUTE_RESOLUTION,
+            ClauseType.GOVERNING_LAW,
+            ClauseType.FORCE_MAJEURE,
+        ],
+        "present": ["payment_terms"],
+    },
+    {
+        "text": """
+CONSULTING SERVICES AGREEMENT
+
+Between TechConsult LLC ("Consultant") and GlobalCorp ("Client").
+
+1. SERVICES
+Consultant shall provide IT strategy consulting services.
+
+2. FEES
+Client shall pay Consultant $200/hour, invoiced monthly.
+
+3. INTELLECTUAL PROPERTY
+All work product shall be owned by Client upon payment.
+
+4. TERM
+This agreement commences on the date signed and continues for 6 months.
+
+Signed: ________________
+Date: ________________
+""",
+        "contract_type": "consulting",
+        "missing": [
+            ClauseType.TERMINATION,
+            ClauseType.LIMITATION_LIABILITY,
+            ClauseType.INDEMNIFICATION,
+            ClauseType.DISPUTE_RESOLUTION,
+        ],
+        "present": ["fees", "intellectual_property", "term"],
+    },
+]
+
 
 class EasyTask(BaseTask):
     """
-    Easy task: Find a specific item in a small collection
-    Grader: Based on proximity to target item
+    Easy task: Identify missing clauses in a simple contract.
+    Grader: Based on correctly identifying missing critical clauses.
     """
 
     def __init__(self):
-        super().__init__(max_steps=10, difficulty="easy")
-        self.target = None
+        super().__init__(max_steps=20, difficulty="easy")
+        self.found_clauses = set()
+        self.contract = None
+        self.clause_values = [c.value for c in ClauseType]
 
-    async def reset(self) -> MyObservation:
-        # Initialize easy task state
-        self.target = self._generate_easy_target()
-        self.current_state = self._init_state()
+    async def reset(self) -> ContractClauseObservation:
+        self.found_clauses = set()
         self.step_count = 0
-        return MyObservation(
-            current_state=self.current_state,
-            available_actions=self._get_available_actions(),
-            task_description=f"Easy task: Find the item '{self.target}' among 5 items"
+        self.current_state = {"identified_clauses": []}
+        self.contract = random.choice(EASY_CONTRACTS)
+        return ContractClauseObservation(
+            contract_text=self.contract["text"],
+            task_description="Identify the missing critical clauses in this contract.",
+            current_score=0.0,
+            step_count=0,
+            max_steps=self.max_steps,
+            available_actions=[
+                ActionType.FLAG_MISSING,
+                ActionType.REQUEST_CLARIFICATION,
+            ],
+            progress_hint="Look for standard contract clauses that are missing.",
         )
 
-    async def step(self, action: MyAction) -> Tuple[MyObservation, float, bool]:
+    async def step(
+        self, action: ContractClauseAction
+    ) -> Tuple[ContractClauseObservation, float, bool]:
         return await super().step(action)
 
-    def _generate_easy_target(self):
-        """Generate a simple target for the easy task"""
-        return "item_3"
-
-    def _init_state(self):
-        """Initialize the environment state"""
-        return {
-            "items": ["item_1", "item_2", "item_3", "item_4", "item_5"],
-            "current_position": 0,
-            "found_item": None
-        }
-
-    def _get_available_actions(self):
-        """Get list of available actions"""
-        return ["move_left", "move_right", "select_current", "check_item"]
-
-    def _apply_action(self, action: MyAction):
-        """Apply the action to the current state"""
+    def _apply_action(self, action: ContractClauseAction) -> dict:
         state = self.current_state.copy()
 
-        if action.action_type == "move_left":
-            state["current_position"] = max(0, state["current_position"] - 1)
-        elif action.action_type == "move_right":
-            state["current_position"] = min(len(state["items"]) - 1, state["current_position"] + 1)
-        elif action.action_type == "select_current":
-            current_item = state["items"][state["current_position"]]
-            state["found_item"] = current_item
-        elif action.action_type == "check_item":
-            # This action doesn't change state but might provide info
+        if action.action_type == ActionType.FLAG_MISSING and action.missing_clauses:
+            for clause in action.missing_clauses:
+                if isinstance(clause, ClauseType):
+                    self.found_clauses.add(clause.value)
+                elif isinstance(clause, str) and clause in self.clause_values:
+                    self.found_clauses.add(clause)
+            state["identified_clauses"] = list(self.found_clauses)
+        elif action.action_type == ActionType.REQUEST_CLARIFICATION:
             pass
 
         return state
 
-    def _grade(self) -> float:
-        state = self.current_state
-        target = self.target
-        """
-        Grade the current state based on proximity to target
-        Returns a value between 0.0 and 1.0
-        """
-        if state["found_item"] == target:
-            return 1.0
-        elif state["found_item"] is not None:
-            # Wrong item selected
-            return 0.1
+    def _get_available_actions(self):
+        return [ActionType.FLAG_MISSING, ActionType.REQUEST_CLARIFICATION]
 
-        # Calculate proximity based on distance to target
-        items = state["items"]
-        try:
-            target_index = items.index(target)
-            current_index = state["current_position"]
-            max_distance = len(items) - 1
-            distance = abs(target_index - current_index)
+    def _get_contract_text(self) -> str:
+        return self.contract["text"] if self.contract else ""
 
-            # Convert distance to reward (closer = higher reward)
-            if max_distance == 0:
-                return 1.0
-            return 1.0 - (distance / max_distance)
-        except ValueError:
-            # Target not in items
+    def _get_task_description(self) -> str:
+        return "Identify the missing critical clauses in this contract."
+
+    def _grade(self, action: ContractClauseAction) -> float:
+        if action.action_type != ActionType.FLAG_MISSING or not action.missing_clauses:
             return 0.0
 
-    def _get_hint(self, reward: float) -> str:
-        """Provide a hint based on the current reward"""
-        if reward >= 0.9:
-            return "You're very close to the target!"
-        elif reward >= 0.7:
-            return "You're getting closer to the target."
-        elif reward >= 0.5:
-            return "You're halfway there."
-        elif reward >= 0.3:
-            return "You're making some progress."
-        else:
-            return "Keep searching for the target."
+        required = set(self.contract["missing"])
+        identified = set(action.missing_clauses)
+        correct = required & identified
 
+        score = min(len(correct) * 0.25, 1.0)
+
+        present_values = set(self.contract["present"])
+        false_positives = sum(1 for c in identified if c.value in present_values)
+        score = max(0.0, score - false_positives * 0.05)
+
+        return round(min(max(score, 0.0), 1.0), 4)
+
+    def _get_hint(self, reward: float) -> str:
+        if reward >= 0.9:
+            return "Excellent! You've found most missing clauses."
+        elif reward >= 0.7:
+            return "Good progress. Check for termination and payment terms."
+        elif reward >= 0.5:
+            return "Keep looking. Think about what happens when the agreement ends."
+        elif reward >= 0.3:
+            return "Consider standard business contract elements."
+        else:
+            return "Look for: What governs the agreement? How does it end? How is payment handled?"

@@ -1,6 +1,12 @@
-from models import MyAction, MyObservation, MyState
+from models import (
+    ContractClauseAction,
+    ContractClauseObservation,
+    ContractClauseState,
+    StepResult,
+)
 import httpx
 from typing import Optional
+
 
 class MyEnvClient:
     """Client for interacting with the environment"""
@@ -15,29 +21,24 @@ class MyEnvClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
 
-    async def reset(self, task_id: str = "easy") -> MyObservation:
+    async def reset(self, task_id: str = "easy") -> ContractClauseObservation:
         response = await self.client.post(
-            f"{self.base_url}/reset",
-            json={"task_id": task_id}
+            f"{self.base_url}/reset", json={"task_id": task_id}
         )
         response.raise_for_status()
         data = response.json()
-        return MyObservation(**data)
+        return ContractClauseObservation(**data)
 
-    async def step(self, action: MyAction) -> "StepResult":
+    async def step(self, action: ContractClauseAction) -> StepResult:
         response = await self.client.post(
-            f"{self.base_url}/step",
-            json=action.model_dump()
+            f"{self.base_url}/step", json=action.model_dump()
         )
         response.raise_for_status()
         data = response.json()
-
-        # Import here to avoid circular imports
-        from models import StepResult
         return StepResult(**data)
 
-    async def state(self) -> MyState:
+    async def state(self) -> ContractClauseState:
         response = await self.client.get(f"{self.base_url}/state")
         response.raise_for_status()
         data = response.json()
-        return MyState(**data)
+        return ContractClauseState(**data)
