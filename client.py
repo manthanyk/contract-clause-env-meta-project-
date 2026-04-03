@@ -31,7 +31,7 @@ class MyEnvClient:
 
     async def step(self, action: ContractClauseAction) -> StepResult:
         response = await self.client.post(
-            f"{self.base_url}/step", json=action.model_dump()
+            f"{self.base_url}/step", json=action.model_dump(exclude_none=True)
         )
         response.raise_for_status()
         data = response.json()
