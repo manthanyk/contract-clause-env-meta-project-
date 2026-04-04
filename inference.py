@@ -1,117 +1,65 @@
 import os
 import json
+import uuid
 import asyncio
-import subprocess
-from typing import Dict, Any
-
 import httpx
+from typing import Dict, Any, List
 from openai import OpenAI
 
-from client import MyEnvClient
-from models import (
-    ContractClauseAction,
-    ActionType,
-    ClauseType,
-    RiskLevel,
-)
-
-# Environment variables
+# ── Configuration ──────────────────────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
-BASE_URL = os.getenv("ENV_URL", "http://localhost:7860")
-LOCAL_SERVER = os.getenv("LOCAL_SERVER", "true").lower() != "false"
+ENV_URL = os.getenv("ENV_URL", "https://manthanyk-contract-clause-env.hf.space")
+TIMEOUT_SECONDS = 20 * 60  # 20 minutes total
 
-# OpenAI client pointing to HF endpoint
-client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+llm_client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
 
-_server_process = None
-
-
-async def _is_server_up(base_url: str) -> bool:
-    try:
-        async with httpx.AsyncClient(base_url=base_url, timeout=2.0) as c:
-            resp = await c.get("/health")
-            return resp.status_code == 200
-    except Exception:
-        return False
+# ── HTTP client ────────────────────────────────────────────────────────────────
+_http = httpx.AsyncClient(timeout=30.0)
 
 
-async def _ensure_server(base_url: str):
-    """Start local uvicorn if requested and not already running."""
-    global _server_process
-    if not LOCAL_SERVER:
-        return
-    if await _is_server_up(base_url):
-        return
-    _server_process = subprocess.Popen(
-        ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"],
-        cwd=os.path.dirname(__file__),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    for _ in range(10):
-        if await _is_server_up(base_url):
-            return
-        await asyncio.sleep(0.5)
-    raise RuntimeError("Local server failed to start on http://localhost:7860")
+async def api_reset(task_id: str) -> Dict[str, Any]:
+    resp = await _http.post(f"{ENV_URL}/reset", json={"task_id": task_id})
+    resp.raise_for_status()
+    return resp.json()
 
 
-def log_start(task_id: str, episode: int):
-    print("[START]", json.dumps({"task_id": task_id, "episode": episode}), flush=True)
+async def api_step(action: Dict[str, Any]) -> Dict[str, Any]:
+    resp = await _http.post(f"{ENV_URL}/step", json=action)
+    resp.raise_for_status()
+    return resp.json()
 
 
-def log_step(step: int, action: dict, reward: float, done: bool):
+async def api_state() -> Dict[str, Any]:
+    resp = await _http.get(f"{ENV_URL}/state")
+    resp.raise_for_status()
+    return resp.json()
+
+
+# ── Structured logging ─────────────────────────────────────────────────────────
+def log_start(task_id: str, episode_id: str):
     print(
-        "[STEP]",
-        json.dumps({"step": step, "action": action, "reward": reward, "done": done}),
+        f'[START] {{"task_id": "{task_id}", "episode_id": "{episode_id}"}}', flush=True
+    )
+
+
+def log_step(step: int, action: Dict[str, Any], reward: float, done: bool):
+    print(
+        f"[STEP] {json.dumps({'step': step, 'action': action, 'reward': reward, 'done': done})}",
         flush=True,
     )
 
 
-def log_end(total_reward: float, steps: int, task_id: str):
+def log_end(task_id: str, final_score: float):
     print(
-        "[END]",
-        json.dumps(
-            {
-                "total_reward": round(total_reward, 4),
-                "steps": steps,
-                "task_id": task_id,
-            }
-        ),
+        f'[END] {{"task_id": "{task_id}", "final_score": {final_score}}}',
         flush=True,
     )
 
 
-def build_prompt_for_task(task_id: str, obs) -> str:
-    """Build an LLM prompt appropriate for the task type."""
-    if task_id == "easy":
-        return (
-            f"You are reviewing a contract to identify MISSING critical clauses.\n\n"
-            f"Contract text:\n{obs.contract_text}\n\n"
-            f"Available actions: {[a.value for a in obs.available_actions]}\n\n"
-            f"Return a JSON action. Example:\n"
-            f'{{"action_type": "flag_missing", "missing_clauses": ["termination", "payment", "governing_law"]}}'
-        )
-    elif task_id == "medium":
-        return (
-            f"You are assessing the RISK LEVEL of contract clauses.\n\n"
-            f"Contract text:\n{obs.contract_text}\n\n"
-            f"Available actions: {[a.value for a in obs.available_actions]}\n\n"
-            f"Return a JSON action. Example:\n"
-            f'{{"action_type": "risk_assess", "risk_level": "high", "risk_explanation": "The payment clause has excessive penalties."}}'
-        )
-    else:
-        return (
-            f"You are detecting UNFAIR or unconscionable clauses in a contract.\n\n"
-            f"Contract text:\n{obs.contract_text}\n\n"
-            f"Available actions: {[a.value for a in obs.available_actions]}\n\n"
-            f"Return a JSON action. Example:\n"
-            f'{{"action_type": "flag_unfair", "unfair_clause": "unilateral modification", "unfair_reason": "This clause allows one-sided changes."}}'
-        )
-
-
-def _safe_json_parse(raw: str) -> Dict[str, Any]:
+# ── LLM helpers ────────────────────────────────────────────────────────────────
+def _strip_json(raw: str) -> str:
     raw = raw.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
@@ -119,110 +67,145 @@ def _safe_json_parse(raw: str) -> Dict[str, Any]:
             raw = "\n".join(lines[1:-1])
         else:
             raw = "\n".join(lines[1:])
-    return json.loads(raw)
+    return raw.strip()
 
 
-def parse_action(task_id: str, content: str) -> ContractClauseAction:
-    """Parse LLM response into a ContractClauseAction."""
+def _call_llm(prompt: str) -> str:
+    resp = llm_client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a contract review agent. Return valid JSON only.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=500,
+        temperature=0.3,
+    )
+    return resp.choices[0].message.content or ""
+
+
+# ── Task-specific prompts ──────────────────────────────────────────────────────
+PROMPTS = {
+    "easy": (
+        "Identify ALL missing critical clauses in this contract.\n"
+        "Contract:\n{contract_text}\n"
+        "Return ONLY JSON: "
+        '{{"action_type": "flag_missing", "missing_clauses": ["termination", "payment", ...]}}\n'
+        "Possible clause types: termination, payment, liability, limitation_liability, "
+        "indemnification, intellectual_property, confidentiality, governing_law, "
+        "dispute_resolution, force_majeure"
+    ),
+    "medium": (
+        "Assess the risk level of the clauses in this contract.\n"
+        "Contract:\n{contract_text}\n"
+        "Return ONLY JSON: "
+        '{{"action_type": "risk_assess", "risk_level": "high", "risk_explanation": "..."}}\n'
+        "Risk levels: none, low, medium, high, critical"
+    ),
+    "hard": (
+        "Identify ALL unfair or unconscionable clauses in this contract.\n"
+        "Contract:\n{contract_text}\n"
+        "Return ONLY JSON: "
+        '{{"action_type": "flag_unfair", "unfair_clause": "...", "unfair_reason": "..."}}\n'
+        "Be specific about which clause text is unfair and why."
+    ),
+}
+
+MAX_STEPS = {"easy": 20, "medium": 30, "hard": 50}
+
+
+def _build_action(task_id: str, llm_response: str) -> Dict[str, Any]:
+    """Parse LLM response into an action dict for the API."""
     try:
-        data = _safe_json_parse(content)
-        action_type = ActionType(data.get("action_type", "request_clarification"))
-
-        kwargs: dict = {"action_type": action_type}
-
-        if action_type == ActionType.FLAG_MISSING:
-            clauses = data.get("missing_clauses", [])
-            kwargs["missing_clauses"] = [
-                ClauseType(c) for c in clauses if c in [e.value for e in ClauseType]
-            ]
-        elif action_type == ActionType.RISK_ASSESS:
-            rl = data.get("risk_level")
-            kwargs["risk_level"] = (
-                RiskLevel(rl) if rl and rl in [e.value for e in RiskLevel] else None
-            )
-            kwargs["risk_explanation"] = data.get("risk_explanation", "")
-        elif action_type == ActionType.FLAG_UNFAIR:
-            kwargs["unfair_clause"] = data.get("unfair_clause", "")
-            kwargs["unfair_reason"] = data.get("unfair_reason", "")
-        elif action_type == ActionType.REQUEST_CLARIFICATION:
-            kwargs["clarification_request"] = data.get(
-                "clarification_request", "Need more context."
-            )
-
-        return ContractClauseAction(**kwargs)
+        data = json.loads(_strip_json(llm_response))
     except Exception:
-        # Fallback: request clarification
-        return ContractClauseAction(
-            action_type=ActionType.REQUEST_CLARIFICATION,
-            clarification_request="Unable to parse previous response.",
+        return {
+            "action_type": "request_clarification",
+            "clarification_request": "Unable to parse response.",
+        }
+
+    action = {"action_type": data.get("action_type", "request_clarification")}
+
+    if action["action_type"] == "flag_missing":
+        action["missing_clauses"] = data.get("missing_clauses", [])
+    elif action["action_type"] == "risk_assess":
+        action["risk_level"] = data.get("risk_level")
+        action["risk_explanation"] = data.get("risk_explanation", "")
+    elif action["action_type"] == "flag_unfair":
+        action["unfair_clause"] = data.get("unfair_clause", "")
+        action["unfair_reason"] = data.get("unfair_reason", "")
+    elif action["action_type"] == "request_clarification":
+        action["clarification_request"] = data.get(
+            "clarification_request", "Need more context."
         )
 
-
-async def run_episode(task_id: str, episode: int) -> float:
-    """Run one episode and return total reward."""
-    log_start(task_id, episode)
-
-    await _ensure_server(BASE_URL)
-
-    async with MyEnvClient(base_url=BASE_URL) as env:
-        obs = await env.reset(task_id=task_id)
-        total_reward = 0.0
-        done = False
-        step_num = 0
-        max_steps = 20
-
-        while not done and step_num < max_steps:
-            prompt = build_prompt_for_task(task_id, obs)
-            try:
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You are a contract review agent. Respond with valid JSON only.",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    max_tokens=500,
-                    temperature=0.3,
-                )
-                content = response.choices[0].message.content or ""
-            except Exception as e:
-                print(f"LLM error: {e}", flush=True)
-                content = ""
-
-            action = parse_action(task_id, content)
-            result = await env.step(action)
-
-            step_num += 1
-            total_reward += result.reward
-            done = result.done
-            obs = result.observation
-
-            log_step(
-                step=step_num,
-                action=action.model_dump(exclude_none=True),
-                reward=round(result.reward, 4),
-                done=done,
-            )
-
-    log_end(total_reward=total_reward, steps=step_num, task_id=task_id)
-    return total_reward
+    return action
 
 
+# ── Episode runner ─────────────────────────────────────────────────────────────
+async def run_episode(task_id: str) -> float:
+    episode_id = str(uuid.uuid4())[:8]
+    log_start(task_id, episode_id)
+
+    obs = await api_reset(task_id)
+    contract_text = obs.get("contract_text", "")
+    cumulative_score = 0.0
+    max_steps = MAX_STEPS.get(task_id, 20)
+    prompt_template = PROMPTS[task_id]
+
+    for step_num in range(1, max_steps + 1):
+        prompt = prompt_template.format(contract_text=contract_text)
+
+        try:
+            llm_response = await asyncio.to_thread(_call_llm, prompt)
+        except Exception as e:
+            print(f"LLM error on step {step_num}: {e}", flush=True)
+            llm_response = ""
+
+        action = _build_action(task_id, llm_response)
+        result = await api_step(action)
+
+        reward = result.get("reward", 0.0)
+        done = result.get("done", False)
+        cumulative_score = result.get("observation", {}).get(
+            "current_score", cumulative_score
+        )
+
+        log_step(step_num, action, round(reward, 4), done)
+
+        if done:
+            break
+
+    log_end(task_id, round(cumulative_score, 4))
+    return cumulative_score
+
+
+# ── Main ───────────────────────────────────────────────────────────────────────
 async def main():
+    start = asyncio.get_event_loop().time()
     results = {}
 
     for task_id in ["easy", "medium", "hard"]:
+        elapsed = asyncio.get_event_loop().time() - start
+        if elapsed > TIMEOUT_SECONDS:
+            print(f"Timeout reached after {elapsed:.0f}s, stopping.", flush=True)
+            break
         try:
-            score = await run_episode(task_id=task_id, episode=1)
+            score = await run_episode(task_id)
             results[task_id] = score
         except Exception as e:
             print(f"Task '{task_id}' ERROR: {e}", flush=True)
             results[task_id] = 0.0
 
     avg = sum(results.values()) / len(results) if results else 0.0
-    print(f"Average score: {avg:.4f}", flush=True)
+    print(f"\n=== RESULTS ===", flush=True)
+    for t, s in results.items():
+        print(f"  {t}: {s:.4f}", flush=True)
+    print(f"  average: {avg:.4f}", flush=True)
+
+    await _http.aclose()
     return results
 
 
