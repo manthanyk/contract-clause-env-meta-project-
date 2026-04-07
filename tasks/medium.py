@@ -248,7 +248,10 @@ class MediumTask(BaseTask):
                 RiskLevel.CRITICAL,
             ]
             # Guard against risk_level not in risk_order (e.g., RiskLevel.NONE)
-            if action.risk_level in risk_order and self.clause["risk_level"] in risk_order:
+            if (
+                action.risk_level in risk_order
+                and self.clause["risk_level"] in risk_order
+            ):
                 diff = abs(
                     risk_order.index(action.risk_level)
                     - risk_order.index(self.clause["risk_level"])
@@ -279,7 +282,7 @@ class MediumTask(BaseTask):
         if any(kw in explanation for kw in self.clause.get("reason_keywords", [])):
             score += 0.25
 
-        return round(min(max(score, 0.0), 1.0), 4)
+        return round(max(0.05, min(0.95, score)), 4)
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:

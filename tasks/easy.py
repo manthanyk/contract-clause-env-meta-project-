@@ -227,7 +227,7 @@ class EasyTask(BaseTask):
         false_positives = sum(1 for c in identified if c.value in present_values)
         score = max(0.0, score - false_positives * 0.05)
 
-        return round(min(max(score, 0.0), 1.0), 4)
+        return round(max(0.05, min(0.95, score)), 4)
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:
