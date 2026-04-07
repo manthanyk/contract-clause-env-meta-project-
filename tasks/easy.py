@@ -228,7 +228,6 @@ class EasyTask(BaseTask):
         score = max(0.05, score - false_positives * 0.05)
 
         return round(max(0.05, min(0.95, score)), 4)
->>>>>>> origin/main
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:

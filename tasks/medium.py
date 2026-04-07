@@ -233,7 +233,7 @@ class MediumTask(BaseTask):
         return "Assess the risk level (none/low/medium/high/critical) of the highlighted contract clause and explain your reasoning."
 
     def _grade(self, action: ContractClauseAction) -> float:
-        score = 0.06
+        score = 0.05
         explanation = (action.risk_explanation or "").lower()
 
         if action.risk_level is None:
@@ -247,10 +247,6 @@ class MediumTask(BaseTask):
                 RiskLevel.HIGH,
                 RiskLevel.CRITICAL,
             ]
-<<<<<<< HEAD
-            # Guard against risk_level not in risk_order (e.g., RiskLevel.NONE)
-=======
->>>>>>> origin/main
             if (
                 action.risk_level in risk_order
                 and self.clause["risk_level"] in risk_order
