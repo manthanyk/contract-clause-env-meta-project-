@@ -388,7 +388,7 @@ class HardTask(BaseTask):
         if any(kw in full_text for kw in alt_signals) or issues_found >= 5:
             score += 0.25
 
-        return round(min(max(score, 0.0), 1.0), 4)
+        return max(0.06, min(round(score, 4), 0.94))
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:
