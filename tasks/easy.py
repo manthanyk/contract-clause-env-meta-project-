@@ -215,19 +215,19 @@ class EasyTask(BaseTask):
 
     def _grade(self, action: ContractClauseAction) -> float:
         if action.action_type != ActionType.FLAG_MISSING or not action.missing_clauses:
-            return 0.0
+            return 0.05
 
         required = set(self.contract["missing"])
         identified = set(action.missing_clauses)
         correct = required & identified
 
-        score = min(len(correct) * 0.25, 1.0)
+        score = min(len(correct) * 0.25, 0.95)
 
         present_values = set(self.contract["present"])
         false_positives = sum(1 for c in identified if c.value in present_values)
-        score = max(0.0, score - false_positives * 0.05)
+        score = max(0.05, score - false_positives * 0.05)
 
-        return round(max(0.05, min(0.95, score)), 4)
+        return round(score, 4)
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:
