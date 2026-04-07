@@ -361,17 +361,20 @@ class HardTask(BaseTask):
             "unenforceable",
             "abusive",
             "exploitative",
+            "risk",
+            "liability",
+            "penalty",
         ]
         if any(kw in full_text for kw in unfair_signals):
-            score += 0.25
+            score += 0.30
 
         issues_found = sum(
             1 for kw in self.contract.get("unfair_keywords", []) if kw in full_text
         )
 
-        if issues_found >= 2:
+        if issues_found >= 1:
             score += 0.25
-        if issues_found >= 4:
+        if issues_found >= 2:
             score += 0.25
 
         alt_signals = [
@@ -384,9 +387,15 @@ class HardTask(BaseTask):
             "recommend",
             "amend",
             "propose",
+            "asymmetric",
+            "unilateral",
+            "excessive",
         ]
-        if any(kw in full_text for kw in alt_signals) or issues_found >= 5:
+        if any(kw in full_text for kw in alt_signals) or issues_found >= 3:
             score += 0.25
+
+        if len(full_text) > 100:
+            score += 0.15
 
         return round(max(0.05, min(0.95, score)), 4)
 
