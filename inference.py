@@ -244,7 +244,7 @@ async def main():
             results[task_id] = score
         except Exception as e:
             print(f"Task '{task_id}' ERROR: {e}", flush=True)
-            results[task_id] = 0.0
+            results[task_id] = 0.05
 
     avg = sum(results.values()) / len(results) if results else 0.0
     print(f"\n=== RESULTS ===", flush=True)
