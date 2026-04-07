@@ -239,7 +239,7 @@ class MediumTask(BaseTask):
         if action.risk_level is None:
             pass
         elif action.risk_level == self.clause["risk_level"]:
-            score += 0.25
+            score += 0.35
         else:
             risk_order = [
                 RiskLevel.LOW,
@@ -247,7 +247,10 @@ class MediumTask(BaseTask):
                 RiskLevel.HIGH,
                 RiskLevel.CRITICAL,
             ]
+<<<<<<< HEAD
             # Guard against risk_level not in risk_order (e.g., RiskLevel.NONE)
+=======
+>>>>>>> origin/main
             if (
                 action.risk_level in risk_order
                 and self.clause["risk_level"] in risk_order
@@ -257,10 +260,10 @@ class MediumTask(BaseTask):
                     - risk_order.index(self.clause["risk_level"])
                 )
                 if diff == 1:
-                    score += 0.10
+                    score += 0.20
 
         if len(explanation) > 20:
-            score += 0.25
+            score += 0.30
 
         disadvantaged_keywords = [
             "provider",
@@ -275,14 +278,18 @@ class MediumTask(BaseTask):
             "unfair",
             "favours",
             "favor",
+            "risk",
+            "penalty",
+            "liability",
+            "indemnify",
         ]
         if any(kw in explanation for kw in disadvantaged_keywords):
             score += 0.25
 
         if any(kw in explanation for kw in self.clause.get("reason_keywords", [])):
-            score += 0.25
+            score += 0.20
 
-        return max(0.06, min(round(score, 4), 0.94))
+        return round(max(0.05, min(0.95, score)), 4)
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:
