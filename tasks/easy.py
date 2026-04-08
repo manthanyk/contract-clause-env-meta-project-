@@ -231,12 +231,7 @@ class EasyTask(BaseTask):
         present_values = set(self.contract["present"])
         false_positives = sum(1 for c in identified if c.value in present_values)
         score = max(0.05, score - false_positives * 0.05)
-
-<<<<<<< HEAD
-        return _safe_score(score)
-=======
         return safe_score(score)
->>>>>>> e7690ff (final:)
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:
