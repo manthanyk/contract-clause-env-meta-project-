@@ -10,16 +10,40 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Configuration ──────────────────────────────────────────────────────────────
-API_BASE_URL = os.environ["API_BASE_URL"]  # injected by OpenEnv
-API_KEY = os.environ["API_KEY"]  # injected by OpenEnv
-MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
-ENV_URL = os.getenv("ENV_URL", "https://manthanyk-contract-clause-env.hf.space")
+# ── LLM Configuration (Groq → HF → OpenEnv fallback) ───────────────────────
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")
+MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.1-8b-instant")
+
+llm_client = None
+
+if GROQ_API_KEY:
+    llm_client = OpenAI(
+        api_key=GROQ_API_KEY,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    print(f"[INFO] Using Groq with model: {MODEL_NAME}", flush=True)
+
+elif HF_TOKEN:
+    llm_client = OpenAI(
+        api_key=HF_TOKEN,
+        base_url="https://router.huggingface.co/v1",
+    )
+    print(f"[INFO] Using HF Inference API with model: {MODEL_NAME}", flush=True)
+
+else:
+    API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+    API_KEY = os.getenv("OPENAI_API_KEY", "")
+    if API_KEY:
+        llm_client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+        print(f"[INFO] Using OpenEnv proxy with model: {MODEL_NAME}", flush=True)
+    else:
+        print("[INFO] No LLM API key found, using fallback actions", flush=True)
+
+ENV_URL = os.getenv("ENV_URL", "https://ManthanYk-contract-clause-env.hf.space")
 TIMEOUT_SECONDS = 20 * 60
 
-llm_client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
-
-# ── HTTP client ────────────────────────────────────────────────────────────────
+# ── HTTP client ───────────────────────────────────────────────────────────────
 _http = httpx.AsyncClient(timeout=30.0)
 
 
