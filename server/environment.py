@@ -22,12 +22,12 @@ class MyEnvironment:
         self._episode_id = None
         self._step_count = 0
         self._current_task = None
-        self._score = 0.0
+        self._score = 0.05
 
     async def reset(self, task_id: str = "easy") -> ContractClauseObservation:
         self._episode_id = str(uuid.uuid4())
         self._step_count = 0
-        self._score = 0.0
+        self._score = 0.05
         self._current_task = self.tasks[task_id]
         return await self._current_task.reset()
 

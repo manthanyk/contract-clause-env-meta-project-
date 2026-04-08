@@ -174,7 +174,7 @@ class EasyTask(BaseTask):
         return ContractClauseObservation(
             contract_text=self.contract["text"],
             task_description="Identify the missing critical clauses in this contract.",
-            current_score=0.0,
+            current_score=0.05,
             step_count=0,
             max_steps=self.max_steps,
             available_actions=[

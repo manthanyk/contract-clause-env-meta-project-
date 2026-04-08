@@ -196,7 +196,7 @@ class MediumTask(BaseTask):
         return ContractClauseObservation(
             contract_text=self.contract["text"],
             task_description="Assess the risk level (none/low/medium/high/critical) of the highlighted contract clause and explain your reasoning.",
-            current_score=0.0,
+            current_score=0.05,
             step_count=0,
             max_steps=self.max_steps,
             available_actions=[
