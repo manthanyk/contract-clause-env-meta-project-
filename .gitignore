@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 .DS_Store
 resource_allocation_env.egg-info/
+contract_clause_env.egg-info/

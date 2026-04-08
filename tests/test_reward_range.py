@@ -1,4 +1,11 @@
+import pathlib
+import sys
 import pytest
+
+# Ensure project root is on import path when tests are run directly
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from server.environment import MyEnvironment
 from models import ActionType, ContractClauseAction, RiskLevel
