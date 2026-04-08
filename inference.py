@@ -211,7 +211,7 @@ async def run_episode(task_id: str) -> float:
 
         result = await api_step(action)
 
-        reward = result.get("reward", 0.0)
+        reward = result.get("reward", 0.05)
         done = result.get("done", False)
         cumulative_score = result.get("observation", {}).get(
             "current_score", cumulative_score
