@@ -10,6 +10,11 @@ from tasks.hard import HardTask
 import uuid
 
 
+def _safe_score(score: float) -> float:
+    """Ensure score is strictly between 0 and 1"""
+    return max(0.05, min(0.95, float(score)))
+
+
 class MyEnvironment:
     """Standalone environment implementation"""
 
@@ -34,7 +39,12 @@ class MyEnvironment:
     async def step(self, action: ContractClauseAction) -> StepResult:
         self._step_count += 1
         obs, reward, done = await self._current_task.step(action)
+
+        reward = _safe_score(reward)
         self._score += reward
+
+        obs.current_score = _safe_score(obs.current_score)
+
         return StepResult(
             observation=obs,
             reward=reward,

@@ -217,6 +217,9 @@ async def run_episode(task_id: str) -> float:
             "current_score", cumulative_score
         )
 
+        reward = max(0.05, min(0.95, reward))
+        cumulative_score = max(0.05, min(0.95, cumulative_score))
+
         log_step(step_num, action, round(reward, 4), done)
 
         if done:
