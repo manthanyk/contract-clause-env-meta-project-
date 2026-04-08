@@ -19,7 +19,7 @@ tasks:
       intellectual property clauses.
     difficulty: easy
     max_steps: 20
-    reward_range: [0.0, 1.0]
+    reward_range: [0.05, 0.95]
     success_threshold: 0.8
 
   - id: medium
@@ -30,7 +30,7 @@ tasks:
       clause is problematic.
     difficulty: medium
     max_steps: 30
-    reward_range: [0.0, 1.0]
+    reward_range: [0.05, 0.95]
     success_threshold: 0.7
 
   - id: hard
@@ -41,7 +41,7 @@ tasks:
       alternative language.
     difficulty: hard
     max_steps: 50
-    reward_range: [0.0, 1.0]
+    reward_range: [0.05, 0.95]
     success_threshold: 0.6
 
 api:
@@ -67,5 +67,5 @@ observation_space:
     contract_type: type of contract |
     clauses_present: list of clauses found |
     risk_flags: identified risks |
-    current_score: float 0.0-1.0 |
+    current_score: float 0.05-0.95 |
     progress_hint: guidance for next action

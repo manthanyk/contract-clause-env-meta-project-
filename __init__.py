@@ -1,4 +1,15 @@
 from .client import MyEnvClient
-from .models import MyAction, MyObservation, MyState
+from .models import (
+    ContractClauseAction,
+    ContractClauseObservation,
+    ContractClauseState,
+    StepResult,
+)
 
-__all__ = ["MyEnvClient", "MyAction", "MyObservation", "MyState"]
+__all__ = [
+    "MyEnvClient",
+    "ContractClauseAction",
+    "ContractClauseObservation",
+    "ContractClauseState",
+    "StepResult",
+]

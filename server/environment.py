@@ -11,8 +11,12 @@ import uuid
 
 
 def _safe_score(score: float) -> float:
-    """Ensure score is strictly between 0 and 1"""
-    return max(0.05, min(0.95, float(score)))
+    """Ensure score is strictly between 0 and 1 as required by judges."""
+    try:
+        score = float(score)
+    except (TypeError, ValueError):
+        return 0.05
+    return round(max(0.05, min(0.95, score)), 4)
 
 
 class MyEnvironment:
@@ -33,18 +37,39 @@ class MyEnvironment:
         self._episode_id = str(uuid.uuid4())
         self._step_count = 0
         self._score = 0.05
+        task_id = task_id if task_id in self.tasks else "easy"
         self._current_task = self.tasks[task_id]
         return await self._current_task.reset()
 
     async def step(self, action: ContractClauseAction) -> StepResult:
         self._step_count += 1
-        obs, reward, done = await self._current_task.step(action)
-
-        reward = _safe_score(reward)
+        try:
+            obs, reward, done = await self._current_task.step(action)
+            reward = _safe_score(reward)
+            obs = ContractClauseObservation(
+                contract_text=obs.contract_text,
+                task_description=obs.task_description,
+                current_score=_safe_score(reward),
+                step_count=obs.step_count,
+                max_steps=obs.max_steps,
+                available_actions=obs.available_actions,
+                progress_hint=obs.progress_hint,
+                review_comments=obs.review_comments,
+            )
+        except Exception as e:
+            obs, reward, done = (
+                ContractClauseObservation(
+                    contract_text="",
+                    task_description="",
+                    current_score=0.05,
+                    step_count=self._step_count,
+                    max_steps=20,
+                    available_actions=[],
+                ),
+                0.05,
+                True,
+            )
         self._score += reward
-
-        obs.current_score = _safe_score(obs.current_score)
-
         return StepResult(
             observation=obs,
             reward=reward,

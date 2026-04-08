@@ -6,7 +6,12 @@ from models import (
 )
 from typing import Tuple, List, Dict, Any
 from tasks.base import BaseTask
+from utils import safe_score
 import random
+
+
+def _safe_score(score: float) -> float:
+    return safe_score(score)
 
 
 MEDIUM_CONTRACTS: List[Dict[str, Any]] = [
@@ -233,13 +238,16 @@ class MediumTask(BaseTask):
         return "Assess the risk level (none/low/medium/high/critical) of the highlighted contract clause and explain your reasoning."
 
     def _grade(self, action: ContractClauseAction) -> float:
+        print(f"[DEBUG] medium._grade: action_type={action.action_type}, risk_level={action.risk_level}")
         score = 0.05
         explanation = (action.risk_explanation or "").lower()
 
         if action.risk_level is None:
-            pass
+            score = 0.05
+            print(f"[DEBUG] medium._grade: risk_level is None, score={score}")
         elif action.risk_level == self.clause["risk_level"]:
             score += 0.35
+            print(f"[DEBUG] medium._grade: correct risk level, score={score}")
         else:
             risk_order = [
                 RiskLevel.LOW,
@@ -257,6 +265,7 @@ class MediumTask(BaseTask):
                 )
                 if diff == 1:
                     score += 0.20
+                    print(f"[DEBUG] medium._grade: off by 1, score={score}")
 
         if len(explanation) > 20:
             score += 0.30
@@ -285,7 +294,10 @@ class MediumTask(BaseTask):
         if any(kw in explanation for kw in self.clause.get("reason_keywords", [])):
             score += 0.20
 
-        return round(max(0.05, min(0.95, score)), 4)
+        final_score = _safe_score(score)
+        print(f"[DEBUG] medium._grade: final score: {final_score}")
+        assert 0.0 < final_score < 1.0, f"MEDIUM: INVALID SCORE: {final_score}"
+        return final_score
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:

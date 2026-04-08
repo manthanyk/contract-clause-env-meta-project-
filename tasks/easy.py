@@ -6,7 +6,12 @@ from models import (
 )
 from typing import Tuple, List, Dict, Any
 from tasks.base import BaseTask
+from utils import safe_score
 import random
+
+
+def _safe_score(score: float) -> float:
+    return safe_score(score)
 
 
 EASY_CONTRACTS: List[Dict[str, Any]] = [
@@ -215,7 +220,7 @@ class EasyTask(BaseTask):
 
     def _grade(self, action: ContractClauseAction) -> float:
         if action.action_type != ActionType.FLAG_MISSING or not action.missing_clauses:
-            return 0.05
+            return _safe_score(0.05)
 
         required = set(self.contract["missing"])
         identified = set(action.missing_clauses)
@@ -227,7 +232,7 @@ class EasyTask(BaseTask):
         false_positives = sum(1 for c in identified if c.value in present_values)
         score = max(0.05, score - false_positives * 0.05)
 
-        return round(max(0.05, min(0.95, score)), 4)
+        return _safe_score(score)
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:

@@ -67,7 +67,7 @@ class ContractClauseObservation(BaseModel):
     contract_text: str = Field(..., description="Full contract text to analyze")
     task_description: str = Field(..., description="Description of the task")
     current_score: float = Field(
-        default=0.0, description="Current score in range [0.0, 1.0]"
+        default=0.05, description="Current score in range (0.0, 1.0)"
     )
     step_count: int = Field(default=0, description="Current step count")
     max_steps: int = Field(default=20, description="Maximum steps allowed")
@@ -87,7 +87,7 @@ class ContractClauseState(BaseModel):
     step_count: int = Field(default=0, description="Current step count")
     task_id: str = Field(..., description="Current task ID")
     is_done: bool = Field(default=False, description="Whether episode is complete")
-    cumulative_score: float = Field(default=0.0, description="Cumulative reward score")
+    cumulative_score: float = Field(default=0.05, description="Cumulative reward score")
 
 
 class StepResult(BaseModel):

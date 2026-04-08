@@ -43,21 +43,23 @@ async def api_state() -> Dict[str, Any]:
 
 # ── Structured logging ─────────────────────────────────────────────────────────
 def log_start(task_id: str, episode_id: str):
-    print("[START]", flush=True)
-    print(json.dumps({"task_id": task_id, "episode_id": episode_id}), flush=True)
+    print(
+        f'[START] {{"task_id": "{task_id}", "episode_id": "{episode_id}"}}', flush=True
+    )
 
 
 def log_step(step: int, action: Dict[str, Any], reward: float, done: bool):
-    print("[STEP]", flush=True)
     print(
-        json.dumps({"step": step, "action": action, "reward": reward, "done": done}),
+        f"[STEP] {json.dumps({'step': step, 'action': action, 'reward': reward, 'done': done})}",
         flush=True,
     )
 
 
-def log_end(final_score: float):
-    print("[END]", flush=True)
-    print(f"Final Score: {final_score}", flush=True)
+def log_end(task_id: str, final_score: float):
+    print(
+        f'[END] {{"task_id": "{task_id}", "final_score": {final_score}}}',
+        flush=True,
+    )
 
 
 # ── Fallback scoring (offline, deterministic) ──────────────────────────────────
@@ -194,7 +196,7 @@ async def run_episode(task_id: str) -> float:
 
     obs = await api_reset(task_id)
     contract_text = obs.get("contract_text", "")
-    cumulative_score = 0.0
+    cumulative_score = 0.05
     max_steps = MAX_STEPS.get(task_id, 20)
     prompt_template = PROMPTS[task_id]
 
@@ -203,7 +205,8 @@ async def run_episode(task_id: str) -> float:
 
         try:
             llm_response = await asyncio.to_thread(_call_llm, prompt)
-        except Exception:
+        except Exception as e:
+            print(f"LLM error on step {step_num}: {e}", flush=True)
             llm_response = ""
             action = _fallback_action(task_id, contract_text, step_num)
         else:
@@ -212,12 +215,11 @@ async def run_episode(task_id: str) -> float:
         result = await api_step(action)
 
         reward = result.get("reward", 0.05)
+        reward = max(0.05, min(0.95, reward))
         done = result.get("done", False)
         cumulative_score = result.get("observation", {}).get(
             "current_score", cumulative_score
         )
-
-        reward = max(0.05, min(0.95, reward))
         cumulative_score = max(0.05, min(0.95, cumulative_score))
 
         log_step(step_num, action, round(reward, 4), done)
@@ -225,7 +227,7 @@ async def run_episode(task_id: str) -> float:
         if done:
             break
 
-    log_end(round(cumulative_score, 4))
+    log_end(task_id, round(cumulative_score, 4))
     return cumulative_score
 
 
@@ -237,14 +239,21 @@ async def main():
     for task_id in ["easy", "medium", "hard"]:
         elapsed = asyncio.get_event_loop().time() - start
         if elapsed > TIMEOUT_SECONDS:
+            print(f"Timeout reached after {elapsed:.0f}s, stopping.", flush=True)
             break
         try:
             score = await run_episode(task_id)
             results[task_id] = score
-        except Exception:
+        except Exception as e:
+            print(f"Task '{task_id}' ERROR: {e}", flush=True)
             results[task_id] = 0.05
 
-    avg = sum(results.values()) / len(results) if results else 0.0
+    avg = sum(results.values()) / len(results) if results else 0.05
+    print(f"\n=== RESULTS ===", flush=True)
+    for t, s in results.items():
+        print(f"  {t}: {s:.4f}", flush=True)
+    print(f"  average: {avg:.4f}", flush=True)
+
     await _http.aclose()
     return results
 

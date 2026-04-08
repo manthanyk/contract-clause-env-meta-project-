@@ -1,12 +1,13 @@
 from models import ContractClauseAction, ContractClauseObservation
 from typing import Tuple
 from abc import ABC, abstractmethod
+from utils import safe_score
 
 
 class BaseTask(ABC):
     """Base class for all contract clause task implementations"""
 
-    COMPLETION_THRESHOLD = 0.95
+    COMPLETION_THRESHOLD = 0.93
     HINT_THRESHOLDS = [0.9, 0.7, 0.5, 0.3]
 
     def __init__(self, max_steps: int, difficulty: str):
@@ -26,7 +27,9 @@ class BaseTask(ABC):
         """Execute one step and return (observation, reward, done)"""
         self.step_count += 1
         self.current_state = self._apply_action(action)
-        reward = self._grade(action)
+        raw_grade = self._grade(action)
+        reward = safe_score(raw_grade)
+        assert 0.0 < reward < 1.0, "Reward out of range"
         done = reward >= self.COMPLETION_THRESHOLD or self.step_count >= self.max_steps
         obs = ContractClauseObservation(
             contract_text=self._get_contract_text(),
@@ -47,7 +50,7 @@ class BaseTask(ABC):
 
     @abstractmethod
     def _grade(self, action: ContractClauseAction) -> float:
-        """Calculate reward for current state (0.0-1.0)"""
+        """Calculate reward for current state (0.05-0.95)"""
         pass
 
     @abstractmethod
@@ -72,3 +75,12 @@ class BaseTask(ABC):
     def _get_hint(self, reward: float) -> str:
         """Provide progress hint based on reward level"""
         return ""
+
+    @staticmethod
+    def _clamp(score: float) -> float:
+        """Ensure scores remain strictly within (0, 1)."""
+        try:
+            score = float(score)
+        except (TypeError, ValueError):
+            score = 0.05
+        return round(max(0.05, min(0.95, score)), 4)

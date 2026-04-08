@@ -1,7 +1,12 @@
 from models import ContractClauseAction, ContractClauseObservation, ActionType
 from typing import Tuple, List, Dict, Any
 from tasks.base import BaseTask
+from utils import safe_score
 import random
+
+
+def _safe_score(score: float) -> float:
+    return safe_score(score)
 
 
 HARD_CONTRACTS: List[Dict[str, Any]] = [
@@ -341,7 +346,8 @@ class HardTask(BaseTask):
         return comments
 
     def _grade(self, action: ContractClauseAction) -> float:
-        score = 0.0
+        print(f"[DEBUG] hard._grade: action_type={action.action_type}")
+        score = 0.05
         parts = []
         if action.unfair_reason:
             parts.append(action.unfair_reason)
@@ -367,6 +373,7 @@ class HardTask(BaseTask):
         ]
         if any(kw in full_text for kw in unfair_signals):
             score += 0.30
+            print(f"[DEBUG] hard._grade: found unfair_signals, score={score}")
 
         issues_found = sum(
             1 for kw in self.contract.get("unfair_keywords", []) if kw in full_text
@@ -376,6 +383,7 @@ class HardTask(BaseTask):
             score += 0.25
         if issues_found >= 2:
             score += 0.25
+        print(f"[DEBUG] hard._grade: issues_found={issues_found}, score={score}")
 
         alt_signals = [
             "instead",
@@ -393,11 +401,15 @@ class HardTask(BaseTask):
         ]
         if any(kw in full_text for kw in alt_signals) or issues_found >= 3:
             score += 0.25
+            print(f"[DEBUG] hard._grade: found alt_signals, score={score}")
 
         if len(full_text) > 100:
             score += 0.15
 
-        return round(max(0.05, min(0.95, score)), 4)
+        final_score = _safe_score(score)
+        print(f"[DEBUG] hard._grade: final score: {final_score}")
+        assert 0.0 < final_score < 1.0, f"HARD: INVALID SCORE: {final_score}"
+        return final_score
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:
