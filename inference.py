@@ -13,7 +13,7 @@ load_dotenv()
 # ── LLM Configuration (Groq → HF → OpenEnv fallback) ───────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
-MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 llm_client = None
 
@@ -83,11 +83,12 @@ def log_step(step: int, action: Dict[str, Any], reward: float, done: bool):
 
 
 def log_end(task_id: str, final_score: float, steps: int, all_rewards: list):
-    clamped_val = _safe_score(final_score)
-    rewards_str = ",".join(f"{_safe_score(r):.2f}" for r in all_rewards)
+    clamped_val = float(_safe_score(final_score))
+    # Formatting to 4 decimal places ensures it is never seen as a naked 0 or 1
+    rewards_str = ",".join(f"{float(_safe_score(r)):.4f}" for r in all_rewards)
     success = "true" if clamped_val > 0.5 else "false"
     print(
-        f"[END] success={success} steps={steps} score={clamped_val:.2f} rewards={rewards_str}",
+        f"[END] success={success} steps={steps} score={clamped_val:.4f} rewards={rewards_str}",
         flush=True,
     )
 
@@ -252,12 +253,11 @@ async def run_episode(task_id: str) -> float:
 
         try:
             llm_response = await asyncio.to_thread(_call_llm, prompt)
-        except Exception as e:
-            print(f"LLM error on step {step_num}: {e}", flush=True)
-            llm_response = ""
-            action = _fallback_action(task_id, contract_text, step_num)
-        else:
             action = _build_action(task_id, llm_response)
+        except Exception as e:
+            # If the LLM fails, we MUST use the fallback to get a valid score
+            print(f"LLM error on step {step_num}: {e}", flush=True)
+            action = _fallback_action(task_id, contract_text, step_num)
 
         result = await api_step(action)
 
@@ -293,9 +293,13 @@ async def main():
         try:
             score = await run_episode(task_id)
             results[task_id] = score
+            print(f"Task '{task_id}' completed with score: {score}", flush=True)
         except Exception as e:
             print(f"Task '{task_id}' ERROR: {e}", flush=True)
-            results[task_id] = 0.01
+            import traceback
+
+            traceback.print_exc()
+            results[task_id] = 0.05
 
     avg = sum(results.values()) / len(results) if results else 0.05
     print(f"\n=== RESULTS ===", flush=True)
