@@ -5,7 +5,7 @@ setup(
     version="1.0.0",
     description="A real-world contract clause review environment for AI agents",
     author="ManthanYk",
-    packages=find_packages(),
+    packages=find_packages(include=["common", "common.*", "*"]),
     py_modules=["__init__", "models", "client", "inference"],
     install_requires=[
         "fastapi>=0.68.0",

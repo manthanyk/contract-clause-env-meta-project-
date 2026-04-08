@@ -6,7 +6,7 @@ from models import (
 )
 from typing import Tuple, List, Dict, Any
 from tasks.base import BaseTask
-from utils import safe_score
+from common.utils import safe_score
 import random
 
 
@@ -232,7 +232,11 @@ class EasyTask(BaseTask):
         false_positives = sum(1 for c in identified if c.value in present_values)
         score = max(0.05, score - false_positives * 0.05)
 
+<<<<<<< HEAD
         return _safe_score(score)
+=======
+        return safe_score(score)
+>>>>>>> e7690ff (final:)
 
     def _get_hint(self, reward: float) -> str:
         if reward >= 0.9:

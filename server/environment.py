@@ -7,16 +7,8 @@ from models import (
 from tasks.easy import EasyTask
 from tasks.medium import MediumTask
 from tasks.hard import HardTask
+from common.utils import safe_score
 import uuid
-
-
-def _safe_score(score: float) -> float:
-    """Ensure score is strictly between 0 and 1 as required by judges."""
-    try:
-        score = float(score)
-    except (TypeError, ValueError):
-        return 0.05
-    return round(max(0.05, min(0.95, score)), 4)
 
 
 class MyEnvironment:
@@ -45,11 +37,11 @@ class MyEnvironment:
         self._step_count += 1
         try:
             obs, reward, done = await self._current_task.step(action)
-            reward = _safe_score(reward)
+            reward = safe_score(reward)
             obs = ContractClauseObservation(
                 contract_text=obs.contract_text,
                 task_description=obs.task_description,
-                current_score=_safe_score(reward),
+                current_score=safe_score(reward),
                 step_count=obs.step_count,
                 max_steps=obs.max_steps,
                 available_actions=obs.available_actions,
