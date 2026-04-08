@@ -6,7 +6,7 @@ from models import (
 )
 from typing import Tuple, List, Dict, Any
 from tasks.base import BaseTask
-from utils import safe_score
+from common.utils import safe_score
 import random
 
 

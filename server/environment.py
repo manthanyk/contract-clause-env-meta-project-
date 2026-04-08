@@ -61,12 +61,15 @@ class MyEnvironment:
                 0.05,
                 True,
             )
-        self._score += reward
+        self._score = safe_score(self._score + reward)
         return StepResult(
             observation=obs,
             reward=reward,
             done=done,
-            info={"step": self._step_count, "cumulative_score": self._score},
+            info={
+                "step": self._step_count,
+                "cumulative_score": safe_score(self._score),
+            },
         )
 
     async def state(self) -> ContractClauseState:

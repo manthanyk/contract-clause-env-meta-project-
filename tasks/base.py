@@ -1,7 +1,7 @@
 from models import ContractClauseAction, ContractClauseObservation
 from typing import Tuple
 from abc import ABC, abstractmethod
-from utils import safe_score
+from common.utils import safe_score
 
 
 class BaseTask(ABC):
