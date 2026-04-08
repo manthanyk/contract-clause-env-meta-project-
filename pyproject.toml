@@ -21,4 +21,4 @@ server = "server.app:main"
 
 [tool.setuptools]
 py-modules = ["__init__", "models", "client", "inference"]
-packages = ["server", "tasks"]
+packages = ["server", "tasks", "common"]
