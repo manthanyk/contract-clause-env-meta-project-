@@ -1,5 +1,6 @@
 import pathlib
 import sys
+import asyncio
 import pytest
 
 # Ensure project root is on import path when tests are run directly
@@ -16,16 +17,18 @@ def _assert_bounds(val: float):
     assert val not in (0.0, 1.0)
 
 
-@pytest.mark.asyncio
-async def test_reset_scores_in_range():
+def test_reset_scores_in_range():
     env = MyEnvironment()
-    for task_id in ["easy", "medium", "hard"]:
-        obs = await env.reset(task_id)
-        _assert_bounds(obs.current_score)
+
+    async def run():
+        for task_id in ["easy", "medium", "hard"]:
+            obs = await env.reset(task_id)
+            _assert_bounds(obs.current_score)
+
+    asyncio.run(run())
 
 
-@pytest.mark.asyncio
-async def test_step_scores_in_range():
+def test_step_scores_in_range():
     env = MyEnvironment()
     actions = {
         "easy": ContractClauseAction(action_type=ActionType.REQUEST_CLARIFICATION),
@@ -40,8 +43,12 @@ async def test_step_scores_in_range():
             unfair_reason="unfair",
         ),
     }
-    for task_id, action in actions.items():
-        await env.reset(task_id)
-        result = await env.step(action)
-        _assert_bounds(result.reward)
-        _assert_bounds(result.observation.current_score)
+
+    async def run():
+        for task_id, action in actions.items():
+            await env.reset(task_id)
+            result = await env.step(action)
+            _assert_bounds(result.reward)
+            _assert_bounds(result.observation.current_score)
+
+    asyncio.run(run())
