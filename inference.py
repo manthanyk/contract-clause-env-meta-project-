@@ -59,10 +59,11 @@ def log_step(step: int, action: Dict[str, Any], reward: float, done: bool):
 
 
 def log_end(task_id: str, final_score: float, steps: int, all_rewards: list):
-    rewards_str = ",".join(f"{r:.2f}" for r in all_rewards)
-    success = "true" if final_score > 0.5 else "false"
+    clamped_val = _safe_score(final_score)
+    rewards_str = ",".join(f"{_safe_score(r):.2f}" for r in all_rewards)
+    success = "true" if clamped_val > 0.5 else "false"
     print(
-        f"[END] success={success} steps={steps} score={final_score:.2f} rewards={rewards_str}",
+        f"[END] success={success} steps={steps} score={clamped_val:.2f} rewards={rewards_str}",
         flush=True,
     )
 
