@@ -11,10 +11,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Configuration ──────────────────────────────────────────────────────────────
-API_BASE_URL = os.environ["API_BASE_URL"]          # injected by OpenEnv
-API_KEY      = os.environ["API_KEY"]               # injected by OpenEnv
-MODEL_NAME   = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
-ENV_URL      = os.getenv("ENV_URL", "https://manthanyk-contract-clause-env.hf.space")
+API_BASE_URL = os.environ["API_BASE_URL"]  # injected by OpenEnv
+API_KEY = os.environ["API_KEY"]  # injected by OpenEnv
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
+ENV_URL = os.getenv("ENV_URL", "https://manthanyk-contract-clause-env.hf.space")
 TIMEOUT_SECONDS = 20 * 60
 
 llm_client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
@@ -44,20 +44,25 @@ async def api_state() -> Dict[str, Any]:
 # ── Structured logging ─────────────────────────────────────────────────────────
 def log_start(task_id: str, episode_id: str):
     print(
-        f'[START] {{"task_id": "{task_id}", "episode_id": "{episode_id}"}}', flush=True
-    )
-
-
-def log_step(step: int, action: Dict[str, Any], reward: float, done: bool):
-    print(
-        f"[STEP] {json.dumps({'step': step, 'action': action, 'reward': reward, 'done': done})}",
+        f"[START] task={task_id} env=contract_clause_review model={MODEL_NAME}",
         flush=True,
     )
 
 
-def log_end(task_id: str, final_score: float):
+def log_step(step: int, action: Dict[str, Any], reward: float, done: bool):
+    action_str = action.get("action_type", "unknown")
+    done_str = "true" if done else "false"
     print(
-        f'[END] {{"task_id": "{task_id}", "final_score": {final_score}}}',
+        f"[STEP] step={step} action={action_str} reward={reward:.2f} done={done_str} error=null",
+        flush=True,
+    )
+
+
+def log_end(task_id: str, final_score: float, steps: int, all_rewards: list):
+    rewards_str = ",".join(f"{r:.2f}" for r in all_rewards)
+    success = "true" if final_score > 0.5 else "false"
+    print(
+        f"[END] success={success} steps={steps} score={final_score:.2f} rewards={rewards_str}",
         flush=True,
     )
 
@@ -189,15 +194,18 @@ def _build_action(task_id: str, llm_response: str) -> Dict[str, Any]:
     return action
 
 
-
 # ── Safe score clamping (strictly between 0 and 1) ────────────────────────────
 def _safe_score(val) -> float:
-    """Clamp score to strictly (0, 1) — never 0.0 or 1.0."""
+    """Clamp score to strictly (0.05, 0.95) — never 0.0 or 1.0."""
     try:
         val = float(val)
     except (TypeError, ValueError):
         val = 0.05
-    return max(0.01, min(0.99, val))
+    if val <= 0.0:
+        return 0.05
+    if val >= 1.0:
+        return 0.95
+    return max(0.05, min(0.95, val))
 
 
 # ── Episode runner ─────────────────────────────────────────────────────────────
@@ -210,8 +218,11 @@ async def run_episode(task_id: str) -> float:
     cumulative_score = 0.05
     max_steps = MAX_STEPS.get(task_id, 20)
     prompt_template = PROMPTS[task_id]
+    all_rewards = []
+    last_step = 0
 
     for step_num in range(1, max_steps + 1):
+        last_step = step_num
         prompt = prompt_template.format(contract_text=contract_text)
 
         try:
@@ -234,12 +245,13 @@ async def run_episode(task_id: str) -> float:
         else:
             cumulative_score = _safe_score(cumulative_score)
 
+        all_rewards.append(reward)
         log_step(step_num, action, round(reward, 4), done)
 
         if done:
             break
 
-    log_end(task_id, round(cumulative_score, 4))
+    log_end(task_id, round(cumulative_score, 4), last_step, all_rewards)
     return cumulative_score
 
 
