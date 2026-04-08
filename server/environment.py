@@ -7,7 +7,7 @@ from models import (
 from tasks.easy import EasyTask
 from tasks.medium import MediumTask
 from tasks.hard import HardTask
-from common.utils import safe_score
+from common.utils import safe_score, SAFE_MIN, SAFE_MAX
 import uuid
 
 
@@ -23,12 +23,12 @@ class MyEnvironment:
         self._episode_id = None
         self._step_count = 0
         self._current_task = None
-        self._score = 0.05
+        self._score = SAFE_MIN  # Always start at 0.05
 
     async def reset(self, task_id: str = "easy") -> ContractClauseObservation:
         self._episode_id = str(uuid.uuid4())
         self._step_count = 0
-        self._score = 0.05
+        self._score = SAFE_MIN  # Force start at 0.05
         task_id = task_id if task_id in self.tasks else "easy"
         self._current_task = self.tasks[task_id]
         obs = await self._current_task.reset()
@@ -63,22 +63,27 @@ class MyEnvironment:
                 ContractClauseObservation(
                     contract_text="",
                     task_description="",
-                    current_score=0.05,
+                    current_score=SAFE_MIN,
                     step_count=self._step_count,
                     max_steps=20,
                     available_actions=[],
                 ),
-                0.05,
+                SAFE_MIN,
                 True,
             )
         self._score = safe_score(self._score + reward)
+        final_cumulative = safe_score(self._score)
+        assert SAFE_MIN <= final_cumulative <= SAFE_MAX, (
+            f"cumulative out of range: {final_cumulative}"
+        )
+        assert SAFE_MIN <= reward <= SAFE_MAX, f"reward out of range: {reward}"
         return StepResult(
             observation=obs,
             reward=reward,
             done=done,
             info={
                 "step": self._step_count,
-                "cumulative_score": safe_score(self._score),
+                "cumulative_score": final_cumulative,
             },
         )
 
