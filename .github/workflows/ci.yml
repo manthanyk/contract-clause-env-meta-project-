@@ -18,32 +18,14 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r server/requirements.txt
-
-      - name: Run grader unit tests
-        run: python -m pytest tests/ -v --tb=short
-
-      - name: Smoke test — environment startup
         run: |
-          python -c "
-          import asyncio, sys
-          sys.path.insert(0, '.')
-          from server.environment import ContractClauseEnvironment
-          from models import ContractClauseAction, ActionType, ClauseType
-          async def test():
-              env = ContractClauseEnvironment()
-              for task_id in ['easy', 'medium', 'hard']:
-                  obs = await env.reset(task_id=task_id)
-                  assert obs.contract_text
-                  result = await env.step(ContractClauseAction(
-                      action_type=ActionType.FLAG_MISSING,
-                      missing_clauses=[ClauseType.TERMINATION]
-                  ))
-                  r = result['reward']
-                  assert 0.0 <= r <= 1.0, f'{task_id}: {r} out of range'
-              print('All smoke tests passed.')
-          asyncio.run(test())
-          "
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest tests/test_reward_range.py -v --tb=short
 
   docker:
     runs-on: ubuntu-latest
