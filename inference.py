@@ -13,7 +13,7 @@ load_dotenv()
 # ── LLM Configuration (Groq → HF → OpenEnv fallback) ───────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
-MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.1-8b-instant")
+MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
 
 llm_client = None
 
