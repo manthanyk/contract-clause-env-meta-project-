@@ -251,8 +251,8 @@ async def run_episode(task_id: str) -> float:
         if done:
             break
 
-    log_end(task_id, round(cumulative_score, 4), last_step, all_rewards)
-    return cumulative_score
+    log_end(task_id, round(_safe_score(cumulative_score), 4), last_step, all_rewards)
+    return _safe_score(cumulative_score)
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
