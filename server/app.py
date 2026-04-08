@@ -1,4 +1,7 @@
+from typing import Dict
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from server.environment import MyEnvironment
 from models import (
@@ -17,8 +20,10 @@ app = FastAPI(title="Contract Clause Review Environment", version="1.0.0")
 
 
 @app.get("/")
-def root():
-    return {
+def root() -> JSONResponse:
+    """HF Space root endpoint with required contract payload schema."""
+
+    payload: Dict[str, str] = {
         "name": "Contract Clause Review Environment",
         "version": "1.0.0",
         "description": "OpenEnv RL environment for contract clause analysis",
@@ -30,9 +35,9 @@ def root():
             "step": "/step",
             "state": "/state",
             "docs": "/docs",
-        },
-        "status": "running",
+        }
     }
+    return JSONResponse(payload)
 
 
 @app.post("/reset", response_model=ContractClauseObservation)

@@ -1,6 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from enum import Enum
+
+try:
+    from .common.utils import safe_score
+except ImportError:
+    from common.utils import safe_score
 
 
 class ActionType(str, Enum):
@@ -79,6 +84,12 @@ class ContractClauseObservation(BaseModel):
         default_factory=list, description="Comments from review"
     )
 
+    @field_validator("current_score", mode="before")
+    @classmethod
+    def _clamp_current_score(cls, value: Any) -> float:
+        """Normalize observation scores to the allowed open interval."""
+        return safe_score(value)
+
 
 class ContractClauseState(BaseModel):
     """Episode state metadata"""
@@ -89,6 +100,12 @@ class ContractClauseState(BaseModel):
     is_done: bool = Field(default=False, description="Whether episode is complete")
     cumulative_score: float = Field(default=0.05, description="Cumulative reward score")
 
+    @field_validator("cumulative_score", mode="before")
+    @classmethod
+    def _clamp_cumulative_score(cls, value: Any) -> float:
+        """Normalize cumulative scores to the allowed open interval."""
+        return safe_score(value)
+
 
 class StepResult(BaseModel):
     """Result of a step action"""
@@ -97,3 +114,9 @@ class StepResult(BaseModel):
     reward: float
     done: bool
     info: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("reward", mode="before")
+    @classmethod
+    def _clamp_reward(cls, value: Any) -> float:
+        """Normalize rewards to the allowed open interval."""
+        return safe_score(value)

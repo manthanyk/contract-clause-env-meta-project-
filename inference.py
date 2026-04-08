@@ -11,13 +11,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Configuration ──────────────────────────────────────────────────────────────
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN", "")
-ENV_URL = os.getenv("ENV_URL", "https://manthanyk-contract-clause-env.hf.space")
+API_BASE_URL = os.environ["API_BASE_URL"]          # injected by OpenEnv
+API_KEY      = os.environ["API_KEY"]               # injected by OpenEnv
+MODEL_NAME   = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
+ENV_URL      = os.getenv("ENV_URL", "https://manthanyk-contract-clause-env.hf.space")
 TIMEOUT_SECONDS = 20 * 60
 
-llm_client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+llm_client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 
 # ── HTTP client ────────────────────────────────────────────────────────────────
 _http = httpx.AsyncClient(timeout=30.0)
@@ -189,6 +189,17 @@ def _build_action(task_id: str, llm_response: str) -> Dict[str, Any]:
     return action
 
 
+
+# ── Safe score clamping (strictly between 0 and 1) ────────────────────────────
+def _safe_score(val) -> float:
+    """Clamp score to strictly (0, 1) — never 0.0 or 1.0."""
+    try:
+        val = float(val)
+    except (TypeError, ValueError):
+        val = 0.05
+    return max(0.01, min(0.99, val))
+
+
 # ── Episode runner ─────────────────────────────────────────────────────────────
 async def run_episode(task_id: str) -> float:
     episode_id = str(uuid.uuid4())[:8]
@@ -215,12 +226,13 @@ async def run_episode(task_id: str) -> float:
         result = await api_step(action)
 
         reward = result.get("reward", 0.05)
-        reward = max(0.05, min(0.95, reward))
+        reward = _safe_score(reward)
         done = result.get("done", False)
-        cumulative_score = result.get("observation", {}).get(
-            "current_score", cumulative_score
-        )
-        cumulative_score = max(0.05, min(0.95, cumulative_score))
+        raw_score = result.get("observation", {}).get("current_score")
+        if raw_score is not None:
+            cumulative_score = _safe_score(raw_score)
+        else:
+            cumulative_score = _safe_score(cumulative_score)
 
         log_step(step_num, action, round(reward, 4), done)
 
@@ -246,7 +258,7 @@ async def main():
             results[task_id] = score
         except Exception as e:
             print(f"Task '{task_id}' ERROR: {e}", flush=True)
-            results[task_id] = 0.05
+            results[task_id] = 0.01
 
     avg = sum(results.values()) / len(results) if results else 0.05
     print(f"\n=== RESULTS ===", flush=True)

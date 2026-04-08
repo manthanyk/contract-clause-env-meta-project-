@@ -31,7 +31,17 @@ class MyEnvironment:
         self._score = 0.05
         task_id = task_id if task_id in self.tasks else "easy"
         self._current_task = self.tasks[task_id]
-        return await self._current_task.reset()
+        obs = await self._current_task.reset()
+        return ContractClauseObservation(
+            contract_text=obs.contract_text,
+            task_description=obs.task_description,
+            current_score=safe_score(obs.current_score),
+            step_count=obs.step_count,
+            max_steps=obs.max_steps,
+            available_actions=obs.available_actions,
+            progress_hint=obs.progress_hint,
+            review_comments=obs.review_comments,
+        )
 
     async def step(self, action: ContractClauseAction) -> StepResult:
         self._step_count += 1
@@ -48,7 +58,7 @@ class MyEnvironment:
                 progress_hint=obs.progress_hint,
                 review_comments=obs.review_comments,
             )
-        except Exception as e:
+        except Exception:
             obs, reward, done = (
                 ContractClauseObservation(
                     contract_text="",
@@ -78,5 +88,5 @@ class MyEnvironment:
             step_count=self._step_count,
             task_id=self._current_task.__class__.__name__ if self._current_task else "",
             is_done=False,
-            cumulative_score=self._score,
+            cumulative_score=safe_score(self._score),
         )

@@ -1,9 +1,17 @@
-from models import (
-    ContractClauseAction,
-    ContractClauseObservation,
-    ContractClauseState,
-    StepResult,
-)
+try:
+    from .models import (
+        ContractClauseAction,
+        ContractClauseObservation,
+        ContractClauseState,
+        StepResult,
+    )
+except ImportError:
+    from models import (
+        ContractClauseAction,
+        ContractClauseObservation,
+        ContractClauseState,
+        StepResult,
+    )
 import httpx
 from typing import Optional
 
