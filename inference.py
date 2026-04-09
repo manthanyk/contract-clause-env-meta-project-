@@ -10,39 +10,40 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── LLM Configuration (Groq → HF → OpenEnv fallback) ───────────────────────
+# ── LLM Configuration - OpenEnv FIRST (mandatory) → HF → Groq ───────────────
+API_BASE_URL = os.getenv("API_BASE_URL")
+API_KEY      = os.getenv("API_KEY")
+HF_TOKEN     = os.getenv("HF_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-HF_TOKEN = os.getenv("HF_TOKEN")
-MODEL_NAME = "llama-3.3-70b-versatile"
 
-llm_client = None
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 
-if GROQ_API_KEY:
-    llm_client = OpenAI(
-        api_key=GROQ_API_KEY,
-        base_url="https://api.groq.com/openai/v1",
-    )
-    print(f"[INFO] Using Groq with model: {MODEL_NAME}", flush=True)
+if API_BASE_URL and API_KEY:
+    # ← THIS IS REQUIRED BY THE EVALUATOR
+    llm_client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+    print(f"[INFO] Using OpenEnv LiteLLM proxy → {MODEL_NAME}", flush=True)
 
 elif HF_TOKEN:
+    # Local testing - Hugging Face (recommended when Groq is rate-limited)
     llm_client = OpenAI(
         api_key=HF_TOKEN,
         base_url="https://router.huggingface.co/v1",
     )
-    print(f"[INFO] Using HF Inference API with model: {MODEL_NAME}", flush=True)
+    MODEL_NAME = "Qwen/Qwen2.5-32B-Instruct"   # fast + good at JSON
+    print(f"[INFO] Using Hugging Face Inference → {MODEL_NAME}", flush=True)
+
+elif GROQ_API_KEY:
+    # Groq only as last resort
+    llm_client = OpenAI(
+        api_key=GROQ_API_KEY,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    MODEL_NAME = "llama-3.3-70b-versatile"
+    print(f"[INFO] Using Groq → {MODEL_NAME}", flush=True)
 
 else:
-    API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-    API_KEY = os.getenv("OPENAI_API_KEY", "")
-    if API_KEY:
-        llm_client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
-        print(f"[INFO] Using OpenEnv proxy with model: {MODEL_NAME}", flush=True)
-    else:
-        print("[INFO] No LLM API key found, using fallback actions", flush=True)
-
-ENV_URL = os.getenv("ENV_URL", "https://ManthanYk-contract-clause-env.hf.space")
-TIMEOUT_SECONDS = 20 * 60
-
+    print("[INFO] No LLM credentials found → using fallback actions only", flush=True)
+    llm_client = None
 # ── HTTP client ───────────────────────────────────────────────────────────────
 _http = httpx.AsyncClient(timeout=30.0)
 
