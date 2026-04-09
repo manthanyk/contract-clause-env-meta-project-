@@ -16,8 +16,7 @@ def _safe_score(score: float) -> float:
 
 EASY_CONTRACTS: List[Dict[str, Any]] = [
     {
-        "text": """
-SOFTWARE LICENSE AGREEMENT
+        "text": """SOFTWARE LICENSE AGREEMENT
 
 This Software License Agreement (the "Agreement") is entered into between:
 Licensor: ABC Software Corp
@@ -222,14 +221,31 @@ class EasyTask(BaseTask):
         if action.action_type != ActionType.FLAG_MISSING or not action.missing_clauses:
             return _safe_score(0.05)
 
-        required = set(self.contract["missing"])
-        identified = set(action.missing_clauses)
-        correct = required & identified
+        # Convert required clauses to their string values for comparison
+        required_values = set()
+        for clause in self.contract["missing"]:
+            if isinstance(clause, ClauseType):
+                required_values.add(clause.value)
+            else:
+                required_values.add(clause)
+
+        # Convert identified clauses to their string values for comparison
+        identified_values = set()
+        for clause in action.missing_clauses:
+            if isinstance(clause, ClauseType):
+                identified_values.add(clause.value)
+            else:
+                identified_values.add(clause)
+
+        correct = required_values & identified_values
 
         score = min(len(correct) * 0.25, 0.95)
 
         present_values = set(self.contract["present"])
-        false_positives = sum(1 for c in identified if c.value in present_values)
+        false_positives = 0
+        for clause_value in identified_values:
+            if clause_value in present_values:
+                false_positives += 1
         score = max(0.05, score - false_positives * 0.05)
         return safe_score(score)
 

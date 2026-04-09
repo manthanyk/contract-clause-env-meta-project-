@@ -48,9 +48,7 @@ else:
 # ── Environment config ────────────────────────────────────────────────────────
 ENV_URL         = os.getenv("ENV_URL", "https://manthanyk-contract-clause-env.hf.space")
 TIMEOUT_SECONDS = int(os.getenv("TIMEOUT_SECONDS", "1200"))  # 20 min
-
-
-
+    
 # ── HTTP client ───────────────────────────────────────────────────────────────
 _http = httpx.AsyncClient(timeout=30.0)
 
